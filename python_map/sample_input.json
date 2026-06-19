@@ -1,0 +1,21 @@
+{
+    "date": "2026-06-18",
+    "day_label": "Bugun (18-iyun, Chorshanba)",
+    "comment": "Havo ochiq va issiq. Janubda 40°C dan oshadi.",
+    "cities": {
+        "Toshkent":   {"temp_min": 22, "temp_max": 36, "wind": 12, "precip": 0, "weather": "ochiq"},
+        "Samarqand":  {"temp_min": 18, "temp_max": 33, "wind": 8,  "precip": 0, "weather": "az_bulutli"},
+        "Buxoro":     {"temp_min": 24, "temp_max": 40, "wind": 15, "precip": 0, "weather": "ochiq"},
+        "Namangan":   {"temp_min": 20, "temp_max": 35, "wind": 10, "precip": 0, "weather": "az_bulutli"},
+        "Andijon":    {"temp_min": 21, "temp_max": 34, "wind": 8,  "precip": 2, "weather": "yomgir"},
+        "Farg'ona":   {"temp_min": 22, "temp_max": 38, "wind": 6,  "precip": 0, "weather": "ochiq"},
+        "Qarshi":     {"temp_min": 23, "temp_max": 41, "wind": 12, "precip": 0, "weather": "ochiq"},
+        "Nukus":      {"temp_min": 20, "temp_max": 38, "wind": 18, "precip": 0, "weather": "az_bulutli"},
+        "Navoiy":     {"temp_min": 21, "temp_max": 39, "wind": 14, "precip": 0, "weather": "ochiq"},
+        "Termiz":     {"temp_min": 26, "temp_max": 44, "wind": 10, "precip": 0, "weather": "ochiq"},
+        "Jizzax":     {"temp_min": 20, "temp_max": 36, "wind": 11, "precip": 0, "weather": "bulutli"},
+        "Urganch":    {"temp_min": 21, "temp_max": 37, "wind": 16, "precip": 0, "weather": "az_bulutli"},
+        "Guliston":   {"temp_min": 21, "temp_max": 35, "wind": 9,  "precip": 0, "weather": "az_bulutli"},
+        "Shahrisabz": {"temp_min": 19, "temp_max": 34, "wind": 7,  "precip": 0, "weather": "bulutli"}
+    }
+}
