@@ -89,6 +89,18 @@ function buildTable() {
     document.getElementById("comment").value = forecastData.days[currentDay].comment || "";
     tbody.querySelectorAll("input, select").forEach(function(el) {
         el.addEventListener("change", saveField);
+        // Validatsiya — ogohlantirish ranglari
+        el.addEventListener("input", function() {
+            if (this.type === "number" && this.value !== "") {
+                var v = parseFloat(this.value);
+                var field = this.dataset.field;
+                if (field === "temp_max" && v >= 45) this.style.background = "#ffcdd2";
+                else if (field === "temp_max" && v >= 40) this.style.background = "#fff9c4";
+                else if (field === "wind" && v >= 15) this.style.background = "#ffcdd2";
+                else if (field === "wind" && v >= 10) this.style.background = "#fff9c4";
+                else this.style.background = "";
+            }
+        });
     });
 }
 
@@ -130,6 +142,14 @@ function bindEvents() {
     document.getElementById("btnGenerate").addEventListener("click", generate);
     document.getElementById("btnSample").addEventListener("click", loadSample);
 
+    document.getElementById("btnCopyPrev").addEventListener("click", function() {
+        if (currentDay === 0) { alert("I kun uchun oldingi kun mavjud emas."); return; }
+        var prevCities = forecastData.days[currentDay - 1].cities;
+        if (Object.keys(prevCities).length === 0) { alert("Oldingi kunda ma'lumot yo'q."); return; }
+        forecastData.days[currentDay].cities = JSON.parse(JSON.stringify(prevCities));
+        buildTable();
+    });
+
     document.getElementById("btnClear").addEventListener("click", function() {
         if (!confirm("Barcha ma'lumotlar o'chirilsinmi?")) return;
         forecastData.days.forEach(function(d) { d.cities = {}; d.comment = ""; });
@@ -152,6 +172,31 @@ function bindEvents() {
     document.getElementById("btnDownload").addEventListener("click", function() {
         var src = document.getElementById("forecastImage").src;
         if (src) { var a = document.createElement("a"); a.href = src; a.download = "prognoz.png"; a.click(); }
+    });
+
+    document.getElementById("btnPdf").addEventListener("click", function() {
+        var data = window._resultData;
+        if (!data || !data.forecast_id) return;
+        fetch("/api/export-pdf/" + data.forecast_id)
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.pdf_url) {
+                var a = document.createElement("a");
+                a.href = res.pdf_url; a.download = "prognoz.pdf"; a.click();
+            }
+        });
+    });
+
+    document.getElementById("btnTelegram").addEventListener("click", function() {
+        var data = window._resultData;
+        if (!data || !data.forecast_id) return;
+        if (!confirm("Telegram kanalga yuborilsinmi?")) return;
+        fetch("/api/publish-telegram/" + data.forecast_id, { method: "POST" })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.status === "sent") alert("Telegram ga muvaffaqiyatli yuborildi!");
+            else alert("Xatolik: " + JSON.stringify(res));
+        });
     });
 
     document.querySelectorAll(".result-day-nav .day-btn").forEach(function(btn) {

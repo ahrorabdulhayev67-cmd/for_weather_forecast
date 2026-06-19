@@ -213,7 +213,31 @@ def render_forecast_map(day_data, output_path, dpi=180):
             fraction=0.05, pad=0.02, aspect=30)
         cb1.ax.tick_params(labelsize=7)
 
-    # Shahar nomlari
+    # Shahar nomlari + IZOTERMA CHIZIQLARI
+    if grid_t is not None:
+        # Izoterma (contour) chiziqlari: 20°, 30°, 40°
+        contours = ax1.contour(glon, glat, grid_t,
+            levels=[20, 30, 40], colors=["#1b5e20", "#e65100", "#b71c1c"],
+            linewidths=[0.8, 1.0, 1.2], linestyles="--",
+            transform=proj, zorder=6)
+        ax1.clabel(contours, inline=True, fontsize=6, fmt="%d°")
+
+    # Min/Max belgilari
+    temp_vals = []
+    for name, info in cities_data.items():
+        if name in CITY_COORDS and info and info.get("temp_max") is not None:
+            temp_vals.append((name, info["temp_max"]))
+    if temp_vals:
+        max_city = max(temp_vals, key=lambda x: x[1])
+        min_city = min(temp_vals, key=lambda x: x[1])
+        for city_name, val, marker, mc in [
+            (max_city[0], max_city[1], "^", "#b71c1c"),
+            (min_city[0], min_city[1], "v", "#0d47a1")
+        ]:
+            lat, lon = CITY_COORDS[city_name]
+            ax1.plot(lon, lat, marker, color=mc, ms=9, mec="white",
+                     mew=1.5, zorder=25, transform=proj)
+
     for name, info in cities_data.items():
         if name not in CITY_COORDS or not info:
             continue
@@ -370,6 +394,11 @@ def render_forecast_map(day_data, output_path, dpi=180):
 
             row_y -= row_h
 
+    # === VAQT TAMG'ASI ===
+    fig.text(0.98, 0.975,
+        f"Yaratilgan: {datetime.now().strftime('%Y-%m-%d %H:%M')} TSh",
+        fontsize=7, color="#90a4ae", ha="right", va="top")
+
     # === FOOTER ===
     if comment:
         fig.text(0.50, 0.04, comment,
@@ -399,41 +428,3 @@ def get_temp_color(t):
     return "#311b92"
 
 
-
-# === RANG SKALARI ===
-def temp_cmap():
-    colors = [
-        (0.00, (0.10, 0.10, 0.55)),
-        (0.15, (0.08, 0.40, 0.75)),
-        (0.30, (0.20, 0.70, 0.70)),
-        (0.40, (0.20, 0.60, 0.20)),
-        (0.50, (0.60, 0.75, 0.10)),
-        (0.60, (0.95, 0.85, 0.10)),
-        (0.70, (0.95, 0.55, 0.05)),
-        (0.80, (0.85, 0.20, 0.05)),
-        (0.90, (0.65, 0.05, 0.05)),
-        (1.00, (0.45, 0.05, 0.30)),
-    ]
-    return LinearSegmentedColormap.from_list("temp", [(p, c) for p, c in colors])
-
-def precip_cmap():
-    colors = [
-        (0.0,  (1.0, 1.0, 1.0)),
-        (0.1,  (0.85, 0.95, 0.85)),
-        (0.25, (0.55, 0.85, 0.55)),
-        (0.45, (0.20, 0.70, 0.30)),
-        (0.65, (0.10, 0.50, 0.70)),
-        (0.80, (0.05, 0.30, 0.75)),
-        (1.0,  (0.10, 0.10, 0.50)),
-    ]
-    return LinearSegmentedColormap.from_list("precip", [(p, c) for p, c in colors])
-
-def wind_cmap():
-    colors = [
-        (0.0, (0.90, 0.95, 0.90)),
-        (0.3, (0.55, 0.80, 0.60)),
-        (0.5, (0.90, 0.80, 0.20)),
-        (0.7, (0.90, 0.50, 0.10)),
-        (1.0, (0.70, 0.10, 0.10)),
-    ]
-    return LinearSegmentedColormap.from_list("wind", [(p, c) for p, c in colors])

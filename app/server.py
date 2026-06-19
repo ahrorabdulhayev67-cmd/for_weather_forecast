@@ -1,6 +1,6 @@
 """
 Gidrometeorologiya xizmati — Prognoz xarita serveri
-Flask + Matplotlib backend
+Flask + Matplotlib + SQLite backend
 """
 import os, json, uuid
 from datetime import datetime, timedelta
@@ -8,10 +8,16 @@ from pathlib import Path
 from flask import Flask, render_template, request, jsonify
 from flask import send_from_directory
 from map_renderer import render_forecast_map
+from models import db, Forecast, init_db
+from pdf_export import export_forecast_pdf
+from telegram_bot import publish_forecast
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 OUTPUT_DIR = Path("static/output")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Database init
+init_db(app)
 
 MONTHS_UZ = ["yanvar","fevral","mart","aprel","may","iyun",
              "iyul","avgust","sentabr","oktabr","noyabr","dekabr"]
@@ -33,6 +39,11 @@ def generate():
         if not days:
             return jsonify({"success": False, "error": "Ma'lumot topilmadi"})
 
+        # Ma'lumotlar bazasiga saqlash
+        forecast = Forecast(created_by="sinoptik", status="published")
+        for i, day in enumerate(days):
+            forecast.set_day_data(i, day)
+        
         images = []
         telegrams = []
 
@@ -42,14 +53,21 @@ def generate():
             filepath = OUTPUT_DIR / filename
             render_forecast_map(day, str(filepath))
             images.append(f"/static/output/{filename}")
-
-            # Telegram matn
             telegrams.append(build_telegram_text(day, i))
+
+        # Rasm yo'llarini saqlash
+        forecast.image1_path = images[0] if len(images) > 0 else None
+        forecast.image2_path = images[1] if len(images) > 1 else None
+        forecast.image3_path = images[2] if len(images) > 2 else None
+        db.session.add(forecast)
+        db.session.commit()
 
         return jsonify({
             "success": True,
             "images": images,
-            "telegram": telegrams
+            "telegram": telegrams,
+            "forecast_id": forecast.id,
+            "pdf_url": None,  # PDF alohida so'raladi
         })
 
     except Exception as e:
@@ -126,6 +144,93 @@ def build_telegram_text(day_data, day_index):
     return "\n".join(lines)
 
 
+@app.route("/api/export-pdf/<int:forecast_id>")
+def export_pdf(forecast_id):
+    """Prognozni PDF sifatida eksport qilish."""
+    forecast = Forecast.query.get_or_404(forecast_id)
+    images = [p for p in [forecast.image1_path, forecast.image2_path,
+              forecast.image3_path] if p]
+    # Yo'llarni to'g'rilash
+    full_paths = []
+    for img in images:
+        p = Path(img.lstrip("/"))
+        if p.exists():
+            full_paths.append(str(p))
+        else:
+            alt = Path("static/output") / p.name
+            if alt.exists():
+                full_paths.append(str(alt))
+
+    telegrams = []
+    for i in range(3):
+        day = forecast.get_day_data(i)
+        if day:
+            telegrams.append(build_telegram_text(day, i))
+
+    pdf_filename = f"prognoz_{forecast_id}.pdf"
+    pdf_path = str(OUTPUT_DIR / pdf_filename)
+    export_forecast_pdf(full_paths, telegrams, output_path=pdf_path)
+    return jsonify({"success": True, "pdf_url": f"/static/output/{pdf_filename}"})
+
+
+@app.route("/api/publish-telegram/<int:forecast_id>", methods=["POST"])
+def publish_tg(forecast_id):
+    """Prognozni Telegram kanalga yuborish."""
+    forecast = Forecast.query.get_or_404(forecast_id)
+    telegrams = []
+    for i in range(3):
+        day = forecast.get_day_data(i)
+        if day:
+            telegrams.append(build_telegram_text(day, i))
+    result = publish_forecast(forecast, telegrams)
+    return jsonify(result)
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
+
+
+# === API: Arxiv ===
+@app.route("/api/latest")
+def api_latest():
+    """Oxirgi prognozni JSON formatda qaytaradi."""
+    forecast = Forecast.query.order_by(Forecast.created_at.desc()).first()
+    if not forecast:
+        return jsonify({"error": "Hali prognoz mavjud emas"}), 404
+    result = forecast.to_dict()
+    result["days"] = []
+    for i in range(3):
+        day_data = forecast.get_day_data(i)
+        if day_data:
+            result["days"].append(day_data)
+    return jsonify(result)
+
+
+@app.route("/api/archive")
+def api_archive():
+    """Barcha prognozlar ro'yxati."""
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    forecasts = Forecast.query.order_by(
+        Forecast.created_at.desc()
+    ).paginate(page=page, per_page=per_page, error_out=False)
+    return jsonify({
+        "total": forecasts.total,
+        "page": page,
+        "per_page": per_page,
+        "items": [f.to_dict() for f in forecasts.items]
+    })
+
+
+@app.route("/api/forecast/<int:forecast_id>")
+def api_forecast_detail(forecast_id):
+    """Bitta prognoz tafsiloti."""
+    forecast = Forecast.query.get_or_404(forecast_id)
+    result = forecast.to_dict()
+    result["days"] = []
+    for i in range(3):
+        day_data = forecast.get_day_data(i)
+        if day_data:
+            result["days"].append(day_data)
+    return jsonify(result)
