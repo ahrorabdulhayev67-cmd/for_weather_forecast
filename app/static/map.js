@@ -57,6 +57,10 @@ function loadGeoJSON() {
             }
         }).addTo(forecastMap);
         forecastMap.fitBounds(geoLayer.getBounds(), {padding:[10,10]});
+        // GeoJSON yuklangandan keyin — agar ma'lumot allaqachon bor bo'lsa, ranglash
+        if(currentCitiesData) {
+            geoLayer.setStyle(function(f){return getRegionStyle(f);});
+        }
     }).catch(function(err){console.warn("GeoJSON yuklanmadi:",err);});
 }
 
@@ -100,7 +104,16 @@ function renderCityMarkers(citiesData) {
     if(!forecastMap||!markersLayer) return;
     markersLayer.clearLayers();
     currentCitiesData = citiesData;
-    if(geoLayer) geoLayer.setStyle(function(f){return getRegionStyle(f);});
+
+    // GeoJSON qayta ranglash (agar yuklangan bo'lsa)
+    if(geoLayer) {
+        geoLayer.setStyle(function(f){return getRegionStyle(f);});
+    } else {
+        // GeoJSON hali yuklanmagan — 1.5 soniyadan keyin qayta urinish
+        setTimeout(function(){
+            if(geoLayer) geoLayer.setStyle(function(f){return getRegionStyle(f);});
+        }, 1500);
+    }
 
     var COORDS = {
         "Toshkent":[41.30,69.24],"Samarqand":[39.65,66.96],
