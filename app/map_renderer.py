@@ -72,7 +72,7 @@ def get_temp_color(t):
 
 
 
-def render_forecast_map(day_data, output_path, dpi=150):
+def render_forecast_map(day_data, output_path, dpi=180):
     """Professional kompozit prognoz rasmi: xarita + jadval."""
     cities_data = day_data.get("cities", {})
     comment = day_data.get("comment", "")
@@ -133,6 +133,20 @@ def render_forecast_map(day_data, output_path, dpi=150):
 
     # --- SHAHAR MARKERLARI ---
     stroke = [pe.withStroke(linewidth=3, foreground="white")]
+    shadow = [pe.withStroke(linewidth=4, foreground="white")]
+
+    # Yog'ingarchilik zonalari (avval chiziladi — markerlar ostida)
+    for name, info in cities_data.items():
+        if name not in CITY_COORDS or not info:
+            continue
+        precip = info.get("precip", 0)
+        if precip and precip > 0:
+            lat, lon = CITY_COORDS[name]
+            radius = min(0.3 + precip * 0.05, 1.2)
+            circle = plt.Circle((lon, lat), radius,
+                fc="#64b5f6", alpha=0.15, ec="none",
+                transform=proj, zorder=8)
+            map_ax.add_patch(circle)
 
     for name, info in cities_data.items():
         if name not in CITY_COORDS or not info:
@@ -142,23 +156,40 @@ def render_forecast_map(day_data, output_path, dpi=150):
             continue
         tmin = info.get("temp_min")
         lat, lon = CITY_COORDS[name]
+        wind = info.get("wind", 0)
+        weather = info.get("weather", "ochiq")
         clr = get_temp_color(tmax)
         is_capital = (name == CAPITAL)
 
-        # Marker
-        ms = 10 if is_capital else 7
-        map_ax.plot(lon, lat, "o", color=clr, ms=ms,
-                    mec="white", mew=1.5, zorder=20,
+        # Shamol strelkasi
+        if wind and wind > 2:
+            arrow_len = min(wind * 0.04, 0.4)
+            map_ax.annotate("", xy=(lon + arrow_len, lat),
+                xytext=(lon, lat),
+                arrowprops=dict(arrowstyle="->", color="#546e7a",
+                               lw=1.2, mutation_scale=10),
+                transform=proj, zorder=15)
+
+        # Marker — ob-havo hodisasiga qarab shakl
+        ms = 11 if is_capital else 8
+        marker_shape = "o"
+        if weather in ("yomgir", "jala", "momaqaldiroq"):
+            marker_shape = "D"  # romb — yog'ingarchilik
+        elif weather in ("qor", "qor_boroni", "dol"):
+            marker_shape = "^"  # uchburchak — qor/do'l
+
+        map_ax.plot(lon, lat, marker_shape, color=clr, ms=ms,
+                    mec="white", mew=2, zorder=20,
                     transform=proj)
 
         # Nom
-        fs = 9 if is_capital else 8
-        fw = "bold" if is_capital else "medium"
+        fs = 9.5 if is_capital else 8
+        fw = "bold"
         map_ax.annotate(name, (lon, lat),
-            xytext=(0, 10), textcoords="offset points",
-            fontsize=fs, fontweight=fw, color="#263238",
+            xytext=(0, 12), textcoords="offset points",
+            fontsize=fs, fontweight=fw, color="#1a2744",
             ha="center", va="bottom", zorder=22,
-            path_effects=stroke,
+            path_effects=shadow,
             xycoords=proj._as_mpl_transform(map_ax))
 
         # Harorat
@@ -167,11 +198,23 @@ def render_forecast_map(day_data, output_path, dpi=150):
         else:
             t_str = f"{tmax}\u00b0"
         map_ax.annotate(t_str, (lon, lat),
-            xytext=(0, -10), textcoords="offset points",
-            fontsize=8, fontweight="bold", color=clr,
+            xytext=(0, -12), textcoords="offset points",
+            fontsize=8.5, fontweight="bold", color=clr,
             ha="center", va="top", zorder=22,
             path_effects=stroke,
             xycoords=proj._as_mpl_transform(map_ax))
+
+    # Legend (xarita ichida)
+    legend_items = [
+        mpatches.Patch(fc="#b71c1c", label="38\u00b0C+"),
+        mpatches.Patch(fc="#e65100", label="30\u201338\u00b0"),
+        mpatches.Patch(fc="#f57f17", label="22\u201330\u00b0"),
+        mpatches.Patch(fc="#33691e", label="12\u201322\u00b0"),
+        mpatches.Patch(fc="#0d47a1", label="<12\u00b0"),
+    ]
+    map_ax.legend(handles=legend_items, loc="lower left",
+        fontsize=7, framealpha=0.92, edgecolor="#b0bec5",
+        title="T\u00b0C", title_fontsize=7.5, fancybox=True)
 
 
     # --- JADVAL (o'ng panel) ---
@@ -180,18 +223,25 @@ def render_forecast_map(day_data, output_path, dpi=150):
     tbl_ax.set_ylim(0, 1)
     tbl_ax.axis("off")
 
+    # Vertikal ajratuvchi chiziq
+    sep_ax = fig.add_axes([0.632, 0.10, 0.001, 0.80])
+    sep_ax.set_facecolor("#cfd8dc")
+    sep_ax.axis("off")
+
     # Jadval sarlavha
-    tbl_ax.text(0.5, 0.97, "Viloyat markazlari",
-        fontsize=11, fontweight="bold", color="#0d2137",
+    tbl_ax.text(0.5, 0.97, "Viloyat markazlari bo\u2018yicha",
+        fontsize=10, fontweight="bold", color="#0d2137",
         ha="center", va="top")
 
     # Ustun sarlavhalari
     y = 0.92
-    tbl_ax.text(0.02, y, "Shahar", fontsize=8, fontweight="bold", color="#455a64")
-    tbl_ax.text(0.42, y, "T, \u00b0C", fontsize=8, fontweight="bold", color="#455a64")
-    tbl_ax.text(0.65, y, "m/s", fontsize=8, fontweight="bold", color="#455a64")
-    tbl_ax.text(0.80, y, "Hodisa", fontsize=8, fontweight="bold", color="#455a64")
-    tbl_ax.axhline(y=y - 0.012, xmin=0.01, xmax=0.99, color="#b0bec5", lw=0.8)
+    cols = [0.01, 0.35, 0.55, 0.72, 0.88]
+    tbl_ax.text(cols[0], y, "Shahar", fontsize=7.5, fontweight="bold", color="#455a64")
+    tbl_ax.text(cols[1], y, "T, \u00b0C", fontsize=7.5, fontweight="bold", color="#455a64")
+    tbl_ax.text(cols[2], y, "m/s", fontsize=7.5, fontweight="bold", color="#455a64")
+    tbl_ax.text(cols[3], y, "mm", fontsize=7.5, fontweight="bold", color="#455a64")
+    tbl_ax.text(cols[4], y, "Hodisa", fontsize=7.5, fontweight="bold", color="#455a64")
+    tbl_ax.axhline(y=y - 0.012, xmin=0.0, xmax=1.0, color="#b0bec5", lw=0.8)
 
     # Satrlar (harorat bo'yicha tartiblangan)
     sorted_cities = sorted(
@@ -201,40 +251,52 @@ def render_forecast_map(day_data, output_path, dpi=150):
     row_y = y - 0.05
     row_h = 0.055
 
-    for name, info in sorted_cities:
+    for idx, (name, info) in enumerate(sorted_cities):
         if row_y < 0.04:
             break
         tmax = info["temp_max"]
         tmin = info.get("temp_min")
         wind = info.get("wind")
+        precip = info.get("precip", 0)
         weather = info.get("weather", "ochiq")
         clr = get_temp_color(tmax)
         w_label = WEATHER_LABELS.get(weather, "")
 
-        # Rang chizig'i
-        tbl_ax.plot(0.0, row_y, "s", color=clr, ms=6, mec="none",
-                   transform=tbl_ax.transAxes, clip_on=False)
+        # Chap rang chizig'i (mini bar)
+        bar_width = min(tmax / 50.0 * 0.28, 0.28) if tmax > 0 else 0.02
+        tbl_ax.barh(row_y, bar_width, height=0.022, left=cols[1] - 0.02,
+                   color=clr, alpha=0.15, zorder=0)
 
         # Shahar
-        tbl_ax.text(0.02, row_y, name, fontsize=8.5, color="#263238",
-                   va="center")
+        tbl_ax.text(cols[0], row_y, name, fontsize=8, color="#263238",
+                   va="center", fontweight="medium")
 
         # Harorat
         if tmin is not None:
             t_str = f"{tmin}\u00b0\u2013{tmax}\u00b0"
         else:
             t_str = f"{tmax}\u00b0"
-        tbl_ax.text(0.42, row_y, t_str, fontsize=8.5, color=clr,
+        tbl_ax.text(cols[1], row_y, t_str, fontsize=8.5, color=clr,
                    va="center", fontweight="bold")
 
         # Shamol
         if wind:
-            tbl_ax.text(0.65, row_y, str(wind), fontsize=8,
+            tbl_ax.text(cols[2], row_y, str(wind), fontsize=8,
                        color="#546e7a", va="center")
 
+        # Yog'ingarchilik
+        if precip and precip > 0:
+            tbl_ax.text(cols[3], row_y, f"{precip}", fontsize=8,
+                       color="#1565c0", va="center", fontweight="bold")
+
         # Hodisa
-        tbl_ax.text(0.80, row_y, w_label, fontsize=7.5,
+        tbl_ax.text(cols[4], row_y, w_label, fontsize=7,
                    color="#546e7a", va="center")
+
+        # Ajratuvchi chiziq (har 2-satr)
+        if idx % 2 == 1:
+            tbl_ax.axhline(y=row_y - row_h / 2, xmin=0, xmax=1,
+                          color="#eceff1", lw=0.5)
 
         row_y -= row_h
 
