@@ -61,30 +61,17 @@ def generate():
         for i, day in enumerate(days):
             forecast.set_day_data(i, day)
         
-        images = []
         telegrams = []
-
         for i, day in enumerate(days):
-            # Xarita generatsiyasi
-            filename = f"prognoz_{i}_{uuid.uuid4().hex[:6]}.png"
-            filepath = OUTPUT_DIR / filename
-            render_forecast_map(day, str(filepath))
-            images.append(f"/static/output/{filename}")
             telegrams.append(build_telegram_text(day, i))
 
-        # Rasm yo'llarini saqlash
-        forecast.image1_path = images[0] if len(images) > 0 else None
-        forecast.image2_path = images[1] if len(images) > 1 else None
-        forecast.image3_path = images[2] if len(images) > 2 else None
         db.session.add(forecast)
         db.session.commit()
 
         return jsonify({
             "success": True,
-            "images": images,
             "telegram": telegrams,
             "forecast_id": forecast.id,
-            "pdf_url": None,  # PDF alohida so'raladi
         })
 
     except Exception as e:
