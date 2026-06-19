@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gidrometeorologiya xizmati — Prognoz tizimi</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-brand">
+            <img src="/static/logo.svg" alt="O'zgidromet" class="logo">
+            <div class="header-text">
+                <h1>Gidrometeorologiya xizmati agentligi</h1>
+                <p>Qisqa muddatli ob-havo prognozi tizimi</p>
+            </div>
+        </div>
+        <div class="header-meta">
+            <span id="currentDate"></span>
+        </div>
+    </header>
+
+    <main class="main">
+        <!-- Kiritish paneli -->
+        <section class="panel" id="inputSection">
+            <div class="panel-title">
+                <h2>Prognoz ma'lumotlarini kiriting</h2>
+                <div class="panel-controls">
+                    <button class="btn btn-outline" id="btnSample">Namuna yuklash</button>
+                    <button class="btn btn-outline" id="btnClear">Tozalash</button>
+                </div>
+            </div>
+
+            <!-- Kun tablari -->
+            <nav class="day-nav">
+                <button class="day-btn active" data-day="0">I kun</button>
+                <button class="day-btn" data-day="1">II kun</button>
+                <button class="day-btn" data-day="2">III kun</button>
+            </nav>
+
+            <!-- Jadval -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Shahar / viloyat markazi</th>
+                            <th>T<sub>min</sub>, °C</th>
+                            <th>T<sub>max</sub>, °C</th>
+                            <th>Shamol, m/s</th>
+                            <th>Yog'in, mm</th>
+                            <th>Hodisa</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Izoh -->
+            <div class="comment-box">
+                <label for="comment">Sinoptik izohi:</label>
+                <textarea id="comment" rows="3"
+                    placeholder="Masalan: Respublika hududida harorat mevsum me'yoridan 3-5°C yuqori saqlanadi. Farg'ona vodiysida mahalliy momaqaldiroqli yog'ingarchilik ehtimoli bor."></textarea>
+            </div>
+
+            <!-- Generatsiya -->
+            <div class="action-bar">
+                <button class="btn btn-primary" id="btnGenerate">
+                    Xarita va prognozni shakllantirish
+                </button>
+            </div>
+        </section>
+
+        <!-- Natija paneli -->
+        <section class="panel result-panel" id="resultSection" style="display:none;">
+            <div class="panel-title">
+                <h2>Tayyor prognoz</h2>
+                <div class="panel-controls">
+                    <button class="btn btn-outline" id="btnBack">Tahrirlashga qaytish</button>
+                    <button class="btn btn-primary" id="btnDownload">PNG yuklab olish</button>
+                </div>
+            </div>
+
+            <!-- Kun navigatsiyasi -->
+            <nav class="day-nav result-day-nav">
+                <button class="day-btn active" data-day="0">I kun</button>
+                <button class="day-btn" data-day="1">II kun</button>
+                <button class="day-btn" data-day="2">III kun</button>
+            </nav>
+
+            <!-- Xarita natijasi -->
+            <div class="map-result" id="mapResult">
+                <img id="forecastImage" src="" alt="Prognoz xaritasi">
+            </div>
+
+            <!-- Telegram versiya -->
+            <div class="telegram-section">
+                <h3>Telegram uchun matn</h3>
+                <pre id="telegramText"></pre>
+                <button class="btn btn-outline" id="btnCopy">Nusxa olish</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-info">
+            <p>O'zbekiston Respublikasi Ekologiya va iqlim o'zgarishi milliy qo'mitasi huzuridagi</p>
+            <p><strong>Gidrometeorologiya xizmati agentligi</strong></p>
+            <p class="footer-contact">Ishonch telefoni: +998 55 503-21-20</p>
+        </div>
+        <div class="footer-links">
+            <a href="https://hydromet.uz" target="_blank">hydromet.uz</a>
+            <a href="https://t.me/uzhydromet" target="_blank">Telegram</a>
+            <a href="https://www.facebook.com/uzhydromet" target="_blank">Facebook</a>
+            <a href="https://www.instagram.com/uzhydromet" target="_blank">Instagram</a>
+        </div>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
