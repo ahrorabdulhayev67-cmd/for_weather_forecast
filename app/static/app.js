@@ -268,11 +268,46 @@ function generate() {
 function showDayResult(dayIndex) {
     var data = window._resultData;
     if (!data) return;
+    var cities = forecastData.days[dayIndex].cities;
+
+    // Xarita
     initForecastMap("forecastMapContainer");
-    var dayPayload = data.days ? data.days[dayIndex] : null;
-    var cities = dayPayload ? dayPayload.cities : (forecastData.days[dayIndex] ? forecastData.days[dayIndex].cities : {});
-    renderCityMarkers(cities);
+    setTimeout(function() { renderCityMarkers(cities); forecastMap.invalidateSize(); }, 400);
+
+    // Telegram
     document.getElementById("telegramText").textContent = data.telegram[dayIndex];
+
+    // === O'NG PANEL ===
+    var temps=[],winds=[],precips=[],warnings=[];
+    for(var c in cities){var inf=cities[c];if(!inf||inf.temp_max==null)continue;
+        temps.push(inf.temp_max);if(inf.temp_min!=null)temps.push(inf.temp_min);
+        if(inf.wind)winds.push(inf.wind);if(inf.precip&&inf.precip>0)precips.push(inf.precip);
+        if(inf.temp_max>=40)warnings.push({type:"issiqlik",city:c,val:inf.temp_max});
+        if(inf.wind>=15)warnings.push({type:"shamol",city:c,val:inf.wind});
+        if(inf.weather==="momaqaldiroq")warnings.push({type:"momaqaldiroq",city:c});
+        if(inf.precip>=10)warnings.push({type:"sel",city:c,val:inf.precip});}
+
+    var tMin=temps.length?Math.min.apply(null,temps):"—";
+    var tMax=temps.length?Math.max.apply(null,temps):"—";
+    var wMax=winds.length?Math.max.apply(null,winds):0;
+
+    document.getElementById("summaryBlock").innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;"><div style="background:#fff3e0;padding:10px;border-radius:6px;"><div style="font-size:11px;color:#e65100;">Harorat</div><div style="font-size:18px;font-weight:700;color:#bf360c;">'+tMin+'\u2013'+tMax+'\u00b0C</div></div><div style="background:#e3f2fd;padding:10px;border-radius:6px;"><div style="font-size:11px;color:#1565c0;">Shamol</div><div style="font-size:18px;font-weight:700;color:#0d47a1;">'+(wMax>0?"\u2264"+wMax+" m/s":"sust")+'</div></div><div style="background:#e8f5e9;padding:10px;border-radius:6px;"><div style="font-size:11px;color:#2e7d32;">Yog\u2018ingarchilik</div><div style="font-size:15px;font-weight:700;color:#1b5e20;">'+(precips.length?precips.length+" viloyatda":"Kutilmaydi")+'</div></div><div style="background:'+(warnings.length?"#ffebee":"#e8f5e9")+';padding:10px;border-radius:6px;"><div style="font-size:11px;color:'+(warnings.length?"#c62828":"#2e7d32")+';">Xavf</div><div style="font-size:15px;font-weight:700;color:'+(warnings.length?"#b71c1c":"#2e7d32")+';">'+(warnings.length?warnings.length+" ogohlantirish":"Past")+'</div></div></div>';
+
+    // Jadval
+    var sorted=Object.keys(cities).filter(function(c){return cities[c]&&cities[c].temp_max!=null;}).sort(function(a,b){return cities[b].temp_max-cities[a].temp_max;});
+    var HCLR={"ochiq":"#4caf50","qisman_bulutli":"#8bc34a","bulutli":"#9e9e9e","yomgir":"#2196f3","jala":"#03a9f4","momaqaldiroq":"#ff9800","qor":"#90caf9","dol":"#f44336","tuman":"#bdbdbd","chang_boroni":"#795548","qor_boroni":"#607d8b"};
+    var HLBL={"ochiq":"Havo ochiq","qisman_bulutli":"Qisman bulutli","bulutli":"Bulutli","yomgir":"Yomg\u2018ir","jala":"Jala","momaqaldiroq":"Momaqaldiroq","qor":"Qor","dol":"Do\u2018l","tuman":"Tuman","chang_boroni":"Chang bo\u2018roni","qor_boroni":"Qor bo\u2018roni"};
+    var tbl='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f5f5f5;"><th style="text-align:left;padding:5px;">Viloyat</th><th style="padding:5px;">Harorat</th><th style="padding:5px;">Hodisa</th></tr></thead><tbody>';
+    sorted.forEach(function(c){var inf=cities[c];var w=inf.weather||"ochiq";tbl+='<tr style="border-bottom:1px solid #eee;"><td style="padding:4px 5px;">'+c+'</td><td style="padding:4px;text-align:center;font-weight:700;color:'+getTempColorHex(inf.temp_max)+';">'+(inf.temp_min||"")+'\u2013'+inf.temp_max+'\u00b0</td><td style="padding:4px;text-align:center;color:'+(HCLR[w]||"#666")+';font-weight:600;">'+(HLBL[w]||w)+'</td></tr>';});
+    tbl+='</tbody></table>';
+    document.getElementById("regionTable").innerHTML='<h4 style="font-size:12px;font-weight:700;color:#333;margin-bottom:4px;">VILOYATLAR BO\u2018YICHA</h4>'+tbl;
+
+    // Ogohlantirishlar
+    var wHtml="";
+    if(warnings.length){var WS={"issiqlik":"background:#fff3e0;border-left:3px solid #e65100;","shamol":"background:#e3f2fd;border-left:3px solid #1565c0;","momaqaldiroq":"background:#fff8e1;border-left:3px solid #f9a825;","sel":"background:#e8f5e9;border-left:3px solid #2e7d32;"};
+    var WT={"issiqlik":"\ud83d\udd25 Issiqlik","shamol":"\ud83d\udca8 Shamol","momaqaldiroq":"\u26c8\ufe0f Momaqaldiroq","sel":"\ud83c\udf0a Sel"};
+    warnings.forEach(function(w){wHtml+='<div style="'+(WS[w.type]||"")+'padding:6px 10px;border-radius:4px;margin-bottom:4px;font-size:11px;"><b>'+(WT[w.type]||w.type)+'</b> \u2014 '+w.city+(w.val?" ("+w.val+")":"")+'</div>';});}
+    document.getElementById("warningsBlock").innerHTML=wHtml?'<h4 style="font-size:12px;font-weight:700;color:#c62828;margin-bottom:4px;">OGOHLANTIRISHLAR</h4>'+wHtml:"";
 }
 
 

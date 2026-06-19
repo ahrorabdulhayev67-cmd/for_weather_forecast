@@ -16,13 +16,20 @@ var WEATHER_ICONS_MAP = {
 function initForecastMap(containerId) {
     if (forecastMap) { forecastMap.remove(); forecastMap = null; }
     forecastMap = L.map(containerId, {
-        center: [41.0, 65.0], zoom: 6,
-        zoomControl: false, attributionControl: false, preferCanvas: true
+        center: [41.0, 64.5], zoom: 6,
+        zoomControl: false,
+        attributionControl: false,
+        preferCanvas: true,
+        dragging: false,
+        touchZoom: false,
+        doubleClickZoom: false,
+        scrollWheelZoom: false,
+        boxZoom: false,
+        keyboard: false
     });
     L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
         maxZoom: 12, subdomains: "abcd"
     }).addTo(forecastMap);
-    L.control.zoom({ position: "topright" }).addTo(forecastMap);
     markersLayer = L.layerGroup().addTo(forecastMap);
     loadGeoJSON();
 }
