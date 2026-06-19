@@ -86,6 +86,29 @@ def render_forecast_map(day_data, output_path, dpi=150):
         spine.set_color("#bcc8d4")
         spine.set_linewidth(0.5)
 
+    # === O'ZBEKISTON DAVLAT CHEGARASI (Natural Earth asosida) ===
+    uzb_border = np.array([
+        [55.97,41.32],[56.01,41.26],[57.02,41.26],[57.10,41.22],
+        [58.16,42.18],[58.43,42.30],[58.60,42.56],[59.46,42.30],
+        [59.86,42.10],[60.05,42.21],[60.07,41.81],[60.47,41.86],
+        [60.93,41.87],[61.55,41.27],[61.88,41.09],[62.49,39.95],
+        [63.52,39.36],[64.17,38.95],[65.22,38.40],[66.54,38.01],
+        [66.71,37.67],[67.07,37.36],[67.33,37.21],[67.72,37.23],
+        [68.07,36.95],[68.61,37.34],[68.87,37.34],[69.30,37.12],
+        [69.52,37.60],[70.14,37.60],[70.18,37.58],[70.56,38.00],
+        [70.49,38.42],[70.76,38.46],[71.05,38.42],[71.28,38.61],
+        [70.95,39.00],[70.63,39.11],[69.37,39.53],[69.17,39.66],
+        [68.57,39.56],[67.78,39.65],[67.44,39.48],[68.18,40.09],
+        [68.63,40.18],[69.01,40.09],[69.07,40.67],[68.44,40.60],
+        [68.64,40.85],[69.55,40.73],[69.98,40.85],[70.45,40.05],
+        [70.67,40.08],[70.97,40.24],[71.01,40.24],[71.77,40.15],
+        [73.06,40.80],[71.77,42.17],[60.17,44.06],[58.60,45.57],
+        [56.00,45.00],[55.97,41.32]
+    ])
+    ax.fill(uzb_border[:,0], uzb_border[:,1],
+            fc="#e8eef4", ec="none", zorder=1, alpha=0.5)
+    ax.plot(uzb_border[:,0], uzb_border[:,1],
+            color="#1a3a5c", lw=1.8, zorder=5, solid_capstyle="round")
 
     # === SHAHAR MARKERLARI ===
     for name, info in cities_data.items():
@@ -113,8 +136,8 @@ def render_forecast_map(day_data, output_path, dpi=150):
         ax.plot(lon, lat, "o", color=clr, ms=10,
                 mec="white", mew=2, zorder=20)
 
-        # Harorat matni
-        tmin_s = f"{tmin}\u00b0/" if tmin is not None else ""
+        # Harorat matni (tire bilan)
+        tmin_s = f"{tmin}\u00b0\u2013" if tmin is not None else ""
         temp_label = f"{tmin_s}{tmax}\u00b0C"
 
         ax.annotate(name, (lon, lat),
