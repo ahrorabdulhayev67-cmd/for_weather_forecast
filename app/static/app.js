@@ -243,43 +243,4 @@ function loadSample() {
 }
 
 
-function generate() {
-    saveComment();
-    var hasData = false;
-    for (var i = 0; i < forecastData.days.length; i++) {
-        var c = forecastData.days[i].cities;
-        for (var k in c) { if (c[k] && c[k].temp_max != null) { hasData = true; break; } }
-        if (hasData) break;
-    }
-    if (!hasData) { alert("Kamida bitta shahar uchun harorat kiriting."); return; }
 
-    var payload = forecastData.days.map(function(d, i) {
-        return { date: d.date ? d.date.toISOString().slice(0,10) : null, day_index: i, comment: d.comment, cities: d.cities };
-    });
-
-    document.getElementById("btnGenerate").textContent = "Yaratilmoqda...";
-    document.getElementById("btnGenerate").disabled = true;
-
-    fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: payload }) })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) {
-            document.getElementById("inputSection").style.display = "none";
-            document.getElementById("resultSection").style.display = "";
-            window._resultData = data;
-            showDayResult(0);
-        } else { alert("Xatolik: " + (data.error || "")); }
-    })
-    .catch(function(err) { alert("Server xatosi: " + err.message); })
-    .finally(function() {
-        document.getElementById("btnGenerate").textContent = "Xarita va prognozni shakllantirish";
-        document.getElementById("btnGenerate").disabled = false;
-    });
-}
-
-function showDayResult(dayIndex) {
-    var data = window._resultData;
-    if (!data) return;
-    document.getElementById("forecastImage").src = data.images[dayIndex] + "?t=" + Date.now();
-    document.getElementById("telegramText").textContent = data.telegram[dayIndex];
-}
