@@ -170,8 +170,10 @@ function bindEvents() {
     });
 
     document.getElementById("btnDownload").addEventListener("click", function() {
-        var src = document.getElementById("forecastImage").src;
-        if (src) { var a = document.createElement("a"); a.href = src; a.download = "prognoz.png"; a.click(); }
+        exportMapToPNG(function(url) {
+            if (url) { var a = document.createElement("a"); a.href = url; a.download = "prognoz.png"; a.click(); }
+            else { alert("Xaritani PNG formatiga aylantirish imkoni bo'lmadi."); }
+        });
     });
 
     document.getElementById("btnPdf").addEventListener("click", function() {
@@ -266,7 +268,10 @@ function generate() {
 function showDayResult(dayIndex) {
     var data = window._resultData;
     if (!data) return;
-    document.getElementById("forecastImage").src = data.images[dayIndex] + "?t=" + Date.now();
+    initForecastMap("forecastMapContainer");
+    var dayPayload = data.days ? data.days[dayIndex] : null;
+    var cities = dayPayload ? dayPayload.cities : (forecastData.days[dayIndex] ? forecastData.days[dayIndex].cities : {});
+    renderCityMarkers(cities);
     document.getElementById("telegramText").textContent = data.telegram[dayIndex];
 }
 

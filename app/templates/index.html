@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gidrometeorologiya xizmati — Prognoz tizimi</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        .forecast-marker-container { background: none !important; border: none !important; }
+        .forecast-marker { display:flex; align-items:center; gap:4px; background:#fff; border-radius:8px; padding:4px 8px; box-shadow:0 2px 6px rgba(0,0,0,0.18); white-space:nowrap; }
+        .fm-icon { width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:50%; color:#fff; font-size:15px; }
+        .fm-info { display:flex; flex-direction:column; line-height:1.2; }
+        .fm-city { font-size:11px; font-weight:600; color:#333; }
+        .fm-temp { font-size:13px; font-weight:700; }
+        .fm-popup h4 { margin:0 0 4px; }
+        .fm-popup p { margin:2px 0; font-size:13px; }
+    </style>
 </head>
 <body>
     <!-- Header -->
@@ -91,7 +102,7 @@
 
             <!-- Xarita natijasi -->
             <div class="map-result" id="mapResult">
-                <img id="forecastImage" src="" alt="Prognoz xaritasi">
+                <div id="forecastMapContainer" style="width:100%;height:500px;border-radius:8px;overflow:hidden;"></div>
             </div>
 
             <!-- Qo'shimcha amallar -->
@@ -124,6 +135,9 @@
         </div>
     </footer>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.3.0/dist/dom-to-image-more.min.js"></script>
+    <script src="/static/map.js"></script>
     <script src="/static/app.js"></script>
 </body>
 </html>
