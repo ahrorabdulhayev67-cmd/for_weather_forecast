@@ -1,16 +1,33 @@
 """
 Gidrometeorologiya xizmati — Prognoz xarita serveri
-Flask + Matplotlib + SQLite backend
+Flask + SQLite backend
 """
 import os, json, uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify
 from flask import send_from_directory
-from map_renderer import render_forecast_map
 from models import db, Forecast, init_db
-from pdf_export import export_forecast_pdf
-from telegram_bot import publish_forecast
+
+# map_renderer ixtiyoriy (cartopy bo'lmasa ham ishlaydi)
+try:
+    from map_renderer import render_forecast_map
+    HAS_MAP_RENDERER = True
+except ImportError:
+    HAS_MAP_RENDERER = False
+
+# PDF va Telegram ixtiyoriy
+try:
+    from pdf_export import export_forecast_pdf
+    HAS_PDF = True
+except ImportError:
+    HAS_PDF = False
+
+try:
+    from telegram_bot import publish_forecast
+    HAS_TELEGRAM = True
+except ImportError:
+    HAS_TELEGRAM = False
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 OUTPUT_DIR = Path("static/output")
