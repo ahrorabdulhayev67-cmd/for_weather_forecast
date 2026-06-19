@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>O'zgidromet — Harorat Xaritasi (Heatmap)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .toolbar {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+            color: white;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+        }
+        .toolbar h1 { font-size: 16px; }
+        .toolbar-btns { display: flex; gap: 8px; }
+        .toolbar-btns button {
+            padding: 8px 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: transparent;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .toolbar-btns button.active,
+        .toolbar-btns button:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: white;
+        }
+        #map { flex: 1; }
+</style>
+</head>
+<body>
+    <div class="toolbar">
+        <h1>🗺️ O'zgidromet — Overlay Xaritalar</h1>
+        <div class="toolbar-btns">
+            <button class="active" data-layer="temp">🌡️ Harorat</button>
+            <button data-layer="clouds">☁️ Bulutlilik</button>
+            <button data-layer="precip">🌧️ Yog'ingarchilik</button>
+            <button data-layer="wind">💨 Shamol</button>
+            <button data-layer="pressure">🔵 Bosim</button>
+        </div>
+    </div>
+    <div id="map"></div>
+
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // OpenWeatherMap tile layers (bepul API key bilan ishlaydi)
+        // Demo uchun OWM free tier tile'lardan foydalanamiz
+        const OWM_API_KEY = 'demo_key'; // Production uchun haqiqiy key kerak
+
+        const map = L.map('map').setView([41.3, 64.5], 6);
+
+        // Base layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        // Weather overlay layers
+        // OpenWeatherMap Weather Tiles 2.0 formatida
+        const layers = {
+            temp: null,
+            clouds: null,
+            precip: null,
+            wind: null,
+            pressure: null
+        };
+
+        // Canvas-based temperature interpolation (OWM API key bo'lmaganda)
+        // Bu yerda biz real ma'lumotlar asosida interpolatsiya qilamiz
+        const cityData = [
+            { name: "Toshkent", lat: 41.30, lon: 69.24 },
+            { name: "Samarqand", lat: 39.65, lon: 66.96 },
+            { name: "Buxoro", lat: 39.77, lon: 64.43 },
+            { name: "Namangan", lat: 41.00, lon: 71.67 },
+            { name: "Andijon", lat: 40.78, lon: 72.34 },
+            { name: "Farg'ona", lat: 40.38, lon: 71.79 },
+            { name: "Qarshi", lat: 38.86, lon: 65.80 },
+            { name: "Nukus", lat: 42.46, lon: 59.60 },
+            { name: "Navoiy", lat: 40.10, lon: 65.38 },
+            { name: "Termiz", lat: 37.22, lon: 67.28 },
+            { name: "Jizzax", lat: 40.12, lon: 67.84 },
+            { name: "Urganch", lat: 41.55, lon: 60.63 }
+        ];
+
+
+        // Open-Meteo dan ma'lumot olish va Canvas overlay yaratish
+        let weatherResults = {};
+        let activeLayer = 'temp';
+        let canvasOverlay = null;
+
+        async function fetchAllData() {
+            const lats = cityData.map(c => c.lat).join(',');
+            const lons = cityData.map(c => c.lon).join(',');
+            
+            // Har bir shahar uchun alohida so'rov
+            const promises = cityData.map(city => 
+                fetch(`https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,relative_humidity_2m,cloud_cover,precipitation,wind_speed_10m,surface_pressure`)
+                    .then(r => r.json())
+            );
+
+            const results = await Promise.all(promises);
+            results.forEach((data, i) => {
+                weatherResults[cityData[i].name] = {
+                    ...cityData[i],
+                    temp: data.current.temperature_2m,
+                    humidity: data.current.relative_humidity_2m,
+                    clouds: data.current.cloud_cover,
+                    precip: data.current.precipitation,
+                    wind: data.current.wind_speed_10m,
+                    pressure: data.current.surface_pressure
+                };
+            });
+
+            drawOverlay();
+        }
+
+        // Canvas overlay — harorat interpolatsiyasi
+        function drawOverlay() {
+            if (canvasOverlay) {
+                map.removeLayer(canvasOverlay);
+            }
+
+            const bounds = [[36.5, 56.0], [46.0, 73.5]];
+            const canvas = document.createElement('canvas');
+            canvas.width = 400;
+            canvas.height = 250;
+            const ctx = canvas.getContext('2d');
+
+            const cities = Object.values(weatherResults);
+            if (cities.length === 0) return;
+
+            // IDW (Inverse Distance Weighting) interpolatsiya
+            for (let py = 0; py < canvas.height; py++) {
+                for (let px = 0; px < canvas.width; px++) {
+                    const lat = bounds[1][0] - (py / canvas.height) * (bounds[1][0] - bounds[0][0]);
+                    const lon = bounds[0][1] + (px / canvas.width) * (bounds[1][1] - bounds[0][1]);
+
+                    let weightedSum = 0;
+                    let weightTotal = 0;
+
+                    cities.forEach(city => {
+                        const dist = Math.sqrt(Math.pow(lat - city.lat, 2) + Math.pow(lon - city.lon, 2));
+                        const weight = 1 / Math.pow(Math.max(dist, 0.01), 2.5);
+                        
+                        let value;
+                        switch(activeLayer) {
+                            case 'temp': value = city.temp; break;
+                            case 'clouds': value = city.clouds; break;
+                            case 'precip': value = city.precip; break;
+                            case 'wind': value = city.wind; break;
+                            case 'pressure': value = city.pressure; break;
+                        }
+                        
+                        weightedSum += value * weight;
+                        weightTotal += weight;
+                    });
+
+                    const interpolated = weightedSum / weightTotal;
+                    const color = getColorForLayer(activeLayer, interpolated);
+                    ctx.fillStyle = color;
+                    ctx.fillRect(px, py, 1, 1);
+                }
+            }
+
+            canvasOverlay = L.imageOverlay(canvas.toDataURL(), bounds, { opacity: 0.55 });
+            canvasOverlay.addTo(map);
+        }
+
+
+        // Qatlamga qarab rang tanlash
+        function getColorForLayer(layer, value) {
+            let r, g, b, a = 180;
+            switch(layer) {
+                case 'temp':
+                    // -5 dan 45 gacha
+                    const t = Math.max(0, Math.min(1, (value + 5) / 50));
+                    if (t < 0.25) { r = 0; g = Math.round(t * 4 * 255); b = 255; }
+                    else if (t < 0.5) { r = 0; g = 255; b = Math.round((1 - (t - 0.25) * 4) * 255); }
+                    else if (t < 0.75) { r = Math.round((t - 0.5) * 4 * 255); g = 255; b = 0; }
+                    else { r = 255; g = Math.round((1 - (t - 0.75) * 4) * 255); b = 0; }
+                    break;
+                case 'clouds':
+                    // 0-100%
+                    const c = value / 100;
+                    r = g = b = Math.round(255 - c * 200);
+                    a = Math.round(c * 200);
+                    break;
+                case 'precip':
+                    // 0-20mm
+                    const p = Math.min(1, value / 20);
+                    r = 0; g = Math.round(100 + (1 - p) * 100); b = 255;
+                    a = Math.round(p * 220 + 30);
+                    break;
+                case 'wind':
+                    // 0-50 km/s
+                    const w = Math.min(1, value / 50);
+                    r = Math.round(w * 255); g = Math.round((1 - w) * 200); b = Math.round(100 + w * 100);
+                    a = 150;
+                    break;
+                case 'pressure':
+                    // 950-1050 hPa
+                    const pr = Math.max(0, Math.min(1, (value - 950) / 100));
+                    r = Math.round((1 - pr) * 200); g = Math.round(pr * 200); b = Math.round(pr * 255);
+                    a = 140;
+                    break;
+            }
+            return `rgba(${r},${g},${b},${a / 255})`;
+        }
+
+        // Toolbar buttons
+        document.querySelectorAll('.toolbar-btns button').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.toolbar-btns button').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                activeLayer = this.dataset.layer;
+                drawOverlay();
+            });
+        });
+
+        // City markers (labels)
+        function addCityLabels() {
+            Object.values(weatherResults).forEach(city => {
+                let val;
+                switch(activeLayer) {
+                    case 'temp': val = `${Math.round(city.temp)}°C`; break;
+                    case 'clouds': val = `${city.clouds}%`; break;
+                    case 'precip': val = `${city.precip}mm`; break;
+                    case 'wind': val = `${Math.round(city.wind)} km/s`; break;
+                    case 'pressure': val = `${Math.round(city.pressure)} hPa`; break;
+                }
+                L.marker([city.lat, city.lon], {
+                    icon: L.divIcon({
+                        className: '',
+                        html: `<div style="background:white;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;box-shadow:0 1px 4px rgba(0,0,0,0.3);white-space:nowrap;">${city.name}: ${val}</div>`,
+                        iconSize: [80, 20],
+                        iconAnchor: [40, 10]
+                    })
+                }).addTo(map);
+            });
+        }
+
+        // Initialize
+        fetchAllData().then(() => {
+            addCityLabels();
+        });
+    </script>
+</body>
+</html>
