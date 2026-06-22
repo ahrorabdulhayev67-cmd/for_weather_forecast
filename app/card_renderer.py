@@ -128,7 +128,7 @@ def render_map_image(day_data, output_path):
         except Exception:
             pass
     draw.text((75, 12), "O'ZGIDROMET", fill="#FFFFFF", font=get_font(20, True))
-    draw.text((75, 40), "Gidrometeorologiya xizmati", fill="#B0C4DE", font=get_font(12))
+    draw.text((75, 40), "Gidrometeorologiya xizmati agentligi", fill="#B0C4DE", font=get_font(12))
     draw.text((W//2, 15), "HARORAT XARITASI", fill="#FFFFFF", font=get_font(18, True), anchor="mt")
     draw.text((W//2, 45), date_label, fill="#B0C4DE", font=get_font(12), anchor="mt")
 
@@ -379,8 +379,9 @@ def render_table_image(day_data, output_path):
             try:
                 icon_img = Image.open(str(icon_path)).convert("RGBA")
                 icon_img = icon_img.resize((icon_size, icon_size), Image.LANCZOS)
-                # PNG transparency uchun
-                img.paste(icon_img, (x_pos, ly), icon_img if icon_img.mode == "RGBA" else None)
+                # RGB rasmga RGBA paste — mask kerak
+                mask = icon_img.split()[3] if icon_img.mode == "RGBA" else None
+                img.paste(icon_img.convert("RGB"), (x_pos, ly), mask)
             except Exception:
                 pass
         draw.text((x_pos + icon_size + 6, ly + 5), link_text, fill="#37474F", font=get_font(11))
@@ -482,8 +483,16 @@ def render_wind_map(day_data, output_path):
         for city, (px, py) in centroids.items():
             info = cities_data.get(city, {})
             wind = info.get("wind") if info else None
-            # Viloyat nomi
-            draw.text((px, py-18), city[:8], fill="#1A2332", font=get_font(8, True), anchor="mm")
+            # Viloyat nomi (shahar emas!)
+            VILOYAT_NAMES = {
+                "Toshkent":"Toshkent","Samarqand":"Samarqand","Buxoro":"Buxoro",
+                "Namangan":"Namangan","Andijon":"Andijon","Farg'ona":"Farg'ona",
+                "Qarshi":"Qashqadaryo","Nukus":"Qoraqalp.","Navoiy":"Navoiy",
+                "Termiz":"Surxondaryo","Jizzax":"Jizzax","Urganch":"Xorazm",
+                "Guliston":"Sirdaryo",
+            }
+            vname = VILOYAT_NAMES.get(city, city)
+            draw.text((px, py-18), vname, fill="#1A2332", font=get_font(8, True), anchor="mm")
             # Shamol qiymati
             if wind:
                 draw.ellipse([(px-25, py-5), (px+25, py+15)], fill="#FFFFFF", outline="#4CAF50")
@@ -583,8 +592,16 @@ def render_precip_map(day_data, output_path):
         for city, (px, py) in centroids.items():
             info = cities_data.get(city, {})
             precip = info.get("precip", 0) if info else 0
-            # Viloyat nomi
-            draw.text((px, py-18), city[:8], fill="#1A2332", font=get_font(8, True), anchor="mm")
+            # Viloyat nomi (shahar emas!)
+            VILOYAT_NAMES = {
+                "Toshkent":"Toshkent","Samarqand":"Samarqand","Buxoro":"Buxoro",
+                "Namangan":"Namangan","Andijon":"Andijon","Farg'ona":"Farg'ona",
+                "Qarshi":"Qashqadaryo","Nukus":"Qoraqalp.","Navoiy":"Navoiy",
+                "Termiz":"Surxondaryo","Jizzax":"Jizzax","Urganch":"Xorazm",
+                "Guliston":"Sirdaryo",
+            }
+            vname = VILOYAT_NAMES.get(city, city)
+            draw.text((px, py-18), vname, fill="#1A2332", font=get_font(8, True), anchor="mm")
             # Yog'ingarchilik qiymati (0 ham ko'rsatiladi)
             draw.ellipse([(px-22, py-5), (px+22, py+12)], fill="#FFFFFF", outline="#1565C0")
             draw.text((px, py+3), f"{precip} mm", fill="#01579B", font=get_font(10, True), anchor="mm")
