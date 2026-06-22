@@ -117,35 +117,35 @@ def render_forecast_card(day_data, output_path, dpi=150):
     geojson_path = download_geojson()
 
     # === FIGURE ===
-    fig = plt.figure(figsize=(15, 9), facecolor="white", dpi=dpi)
+    fig = plt.figure(figsize=(15, 9.5), facecolor="white", dpi=dpi)
 
     # === HEADER (ko'k panel) ===
-    fig.patches.append(Rectangle((0, 0.93), 1, 0.07,
+    fig.patches.append(Rectangle((0, 0.92), 1, 0.08,
         transform=fig.transFigure, facecolor="#0B3D8F",
         edgecolor="none", zorder=0))
 
-    # Logo
+    # Logo (albatta ko'rsatiladi)
     if LOGO_PATH.exists():
         try:
-            logo_ax = fig.add_axes([0.01, 0.935, 0.04, 0.055], zorder=30)
+            logo_ax = fig.add_axes([0.01, 0.925, 0.045, 0.06], zorder=30)
             logo_img = Image.open(str(LOGO_PATH))
             logo_ax.imshow(logo_img)
             logo_ax.axis("off")
         except Exception:
             pass
 
-    fig.text(0.06, 0.965, "O\u2018ZGIDROMET",
-             fontsize=12, fontweight="bold", color="white", va="center", zorder=30)
-    fig.text(0.06, 0.943, "Gidrometeorologiya xizmati agentligi",
-             fontsize=7, color="#B0C4DE", va="center", zorder=30)
+    fig.text(0.065, 0.965, "O\u2018ZGIDROMET",
+             fontsize=13, fontweight="bold", color="white", va="center", zorder=30)
+    fig.text(0.065, 0.94, "Gidrometeorologiya xizmati agentligi",
+             fontsize=7.5, color="#B0C4DE", va="center", zorder=30)
     fig.text(0.50, 0.96, "OB-HAVO PROGNOZI",
-             fontsize=15, fontweight="bold", color="white",
+             fontsize=16, fontweight="bold", color="white",
              ha="center", va="center", zorder=30)
-    fig.text(0.50, 0.94, date_label,
+    fig.text(0.50, 0.935, date_label,
              fontsize=9, color="#B0C4DE", ha="center", va="center", zorder=30)
 
-    # === CHAP: XARITA ===
-    ax_map = fig.add_axes([0.01, 0.08, 0.52, 0.83])
+    # === CHAP: XARITA (kattalashtirilgan) ===
+    ax_map = fig.add_axes([0.01, 0.10, 0.55, 0.80])
     ax_map.set_aspect("equal")
     ax_map.axis("off")
 
@@ -201,7 +201,7 @@ def render_forecast_card(day_data, output_path, dpi=150):
                         path_effects=stroke, zorder=25)
 
     # === O'NG: GURUHLAR JADVALI ===
-    ax_tbl = fig.add_axes([0.55, 0.08, 0.43, 0.83])
+    ax_tbl = fig.add_axes([0.57, 0.10, 0.41, 0.80])
     ax_tbl.axis("off")
     ax_tbl.set_xlim(0, 1)
     ax_tbl.set_ylim(0, 1)
@@ -284,9 +284,20 @@ def render_forecast_card(day_data, output_path, dpi=150):
                     fontsize=7, color="#E65100", va="center",
                     fontweight="bold", transform=ax_tbl.transAxes, zorder=11)
 
-    # === FOOTER ===
-    fig.text(0.02, 0.025, f"\u00a9 {dt.year} Gidrometeorologiya xizmati agentligi  |  hydromet.uz  |  t.me/uzhydromet",
-             fontsize=8, color="#546E7A")
+    # === FOOTER (ijtimoiy tarmoqlar bilan) ===
+    fig.patches.append(Rectangle((0, 0), 1, 0.065,
+        transform=fig.transFigure, facecolor="#F5F7FA",
+        edgecolor="#E0E5EC", linewidth=0.5, zorder=0))
+
+    fig.text(0.02, 0.04, f"\u00a9 {dt.year} Gidrometeorologiya xizmati agentligi",
+             fontsize=8, fontweight="bold", color="#37474F")
+    fig.text(0.02, 0.015,
+             "\U0001F310 uzgidromet.uz    "
+             "\U0001F4F1 t.me/uzgidromet    "
+             "\U0001F4F7 instagram.com/uzgidromet.uz    "
+             "\U0001F44D facebook.com/uzgidromet.uz    "
+             "\U0001F3AC youtube.com/@uzgidromet_",
+             fontsize=7, color="#546E7A")
 
     # === SAQLASH ===
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
