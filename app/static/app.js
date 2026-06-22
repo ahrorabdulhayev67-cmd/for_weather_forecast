@@ -220,32 +220,56 @@ async function generateMap() {
     btn.textContent = 'Yaratilmoqda...';
     btn.disabled = true;
 
-    // Load icons if not loaded yet
+    const dateInput = document.getElementById('forecastDate').value;
+
+    // Server'ga yuborish — rasm generatsiya
+    try {
+        const response = await fetch('/api/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                days: [{
+                    date: dateInput || new Date().toISOString().split('T')[0],
+                    day_index: 0,
+                    cities: weatherData,
+                    comment: ""
+                }]
+            })
+        });
+        const result = await response.json();
+
+        if (result.success && result.images && result.images.length > 0) {
+            // Server rasm qaytardi — ko'rsatish
+            const container = document.getElementById('mapContainer');
+            container.innerHTML = '<img src="' + result.images[0] + '" style="width:100%;border-radius:8px;" alt="Prognoz xaritasi">';
+            document.getElementById('resultPanel').style.display = 'block';
+            document.getElementById('resultPanel').scrollIntoView({ behavior: 'smooth' });
+            showNotification("Prognoz rasmi muvaffaqiyatli yaratildi!");
+        } else {
+            // Fallback: lokal SVG
+            await generateMapLocal(weatherData, dateInput);
+        }
+    } catch (err) {
+        // Offline — lokal SVG
+        await generateMapLocal(weatherData, dateInput);
+    }
+
+    btn.textContent = 'Xaritani yaratish';
+    btn.disabled = false;
+}
+
+// Lokal SVG fallback
+async function generateMapLocal(weatherData, dateInput) {
     if (Object.keys(iconCache).length === 0) {
         await loadIconsAsDataURIs();
     }
-
-    const dateInput = document.getElementById('forecastDate').value;
     const dateStr = formatDate(dateInput);
-
-    // SVG yaratish
     currentSvgContent = renderWeatherMap(weatherData, dateStr, "OB-HAVO PROGNOZI");
-
-    // Ekranga chiqarish
     const container = document.getElementById('mapContainer');
     container.innerHTML = currentSvgContent;
-
-    // Result panelni ko'rsatish
     document.getElementById('resultPanel').style.display = 'block';
-
-    // Restore button
-    btn.textContent = 'Xaritani yaratish';
-    btn.disabled = false;
-
-    // Scroll to result
     document.getElementById('resultPanel').scrollIntoView({ behavior: 'smooth' });
-    
-    showNotification("Xarita muvaffaqiyatli yaratildi!");
+    showNotification("Xarita yaratildi (lokal rejim)");
 }
 
 // ===== YUKLAB OLISH =====

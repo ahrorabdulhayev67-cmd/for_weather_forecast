@@ -118,6 +118,9 @@ def generate():
             if i < 3:
                 forecast.set_day_data(i, day)
 
+        db.session.add(forecast)
+        db.session.flush()  # ID olish uchun
+
         telegrams = []
         for i, day in enumerate(days):
             if i < 3:
