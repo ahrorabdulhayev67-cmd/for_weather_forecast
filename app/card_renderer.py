@@ -94,6 +94,17 @@ def get_temp_color(t):
     return "#0D47A1"
 
 
+def get_temp_color_map(t):
+    """Xarita viloyatlari uchun rang (referensdagidek)."""
+    if t >= 40: return "#F7C1C1"
+    if t >= 37: return "#EF9F27"
+    if t >= 34: return "#EF9F27"
+    if t >= 30: return "#FAC775"
+    if t >= 25: return "#FAC775"
+    if t >= 18: return "#85B7EB"
+    return "#85B7EB"
+
+
 def render_forecast_card(day_data, output_path, dpi=150):
     """
     Bitta kunlik prognoz kartochkasini rasm sifatida generatsiya qiladi.
@@ -143,49 +154,113 @@ def render_forecast_card(day_data, output_path, dpi=150):
     # === AJRATUVCHI CHIZIQ ===
     y_start = 65
 
-    # === CHAP PANEL: XARITA (placeholder — rangli to'rtburchaklar) ===
+    # === CHAP PANEL: O'ZBEKISTON XARITASI (viloyat poligonlari) ===
     map_x, map_y = 15, y_start + 10
     map_w, map_h = 440, 520
 
     # Xarita fon
-    draw.rectangle([(map_x, map_y), (map_x + map_w, map_y + map_h)], fill="#E3F2FD", outline="#90CAF9", width=1)
+    draw.rectangle([(map_x, map_y), (map_x + map_w, map_y + map_h)], fill="#DBEEFF", outline="#90CAF9", width=1)
 
-    # Oddiy viloyat ko'rsatkich (placeholder dots)
-    cities_data = day_data.get("cities", {})
-    CITY_POS_MAP = {
-        "Toshkent": (330, 80), "Namangan": (380, 60), "Andijon": (400, 95),
-        "Farg'ona": (385, 120), "Samarqand": (280, 145), "Jizzax": (310, 105),
-        "Buxoro": (180, 200), "Navoiy": (220, 130), "Qarshi": (270, 230),
-        "Termiz": (320, 310), "Nukus": (100, 130), "Urganch": (110, 190),
-        "Guliston": (345, 115), "Shahrisabz": (285, 200),
+    # SVG koordinatalarini pikselga aylantirish
+    # SVG viewBox: 55, 37, 22, 12 -> map_x..map_x+map_w, map_y..map_y+map_h
+    def svg_to_px(sx, sy):
+        px = map_x + (sx - 55) / 22.0 * map_w
+        py = map_y + (sy - 37) / 12.0 * map_h
+        return (px, py)
+
+    # Viloyat poligonlari (SVG path dan)
+    REGIONS = {
+        "Nukus": {
+            "path": [(55.5,37.5),(63,37.5),(64,38.5),(64.5,40),(63.5,41.5),(61,42.5),(58,43),(55.5,42)],
+            "color": "#85B7EB", "label_pos": (58.5, 40.2)
+        },
+        "Urganch": {
+            "path": [(58,43),(61,42.5),(61.5,44),(60,44.5),(58.5,44)],
+            "color": "#85B7EB", "label_pos": (59.2, 43.5)
+        },
+        "Buxoro": {
+            "path": [(61,42.5),(63.5,41.5),(65,43),(65.5,45.5),(63,46),(61.5,45),(61.5,44)],
+            "color": "#FAC775", "label_pos": (62.5, 44)
+        },
+        "Navoiy": {
+            "path": [(63.5,41.5),(64.5,40),(66,40),(67,41),(67,42.5),(65,43)],
+            "color": "#FAC775", "label_pos": (65, 41.5)
+        },
+        "Samarqand": {
+            "path": [(67,41),(68,40),(69,40.5),(69,42),(68,42.5),(67,42.5)],
+            "color": "#EF9F27", "label_pos": (67.8, 41.5)
+        },
+        "Jizzax": {
+            "path": [(68,40),(69.5,39.5),(70,40.5),(69,42),(69,40.5)],
+            "color": "#EF9F27", "label_pos": (69, 40.3)
+        },
+        "Qarshi": {
+            "path": [(67,42.5),(68,42.5),(69,42),(69.5,44),(68.5,46),(66.5,46),(65.5,45.5),(65,43)],
+            "color": "#FAC775", "label_pos": (67, 44.2)
+        },
+        "Termiz": {
+            "path": [(68.5,46),(69.5,44),(71,44.5),(71,47),(69.5,47.5)],
+            "color": "#F7C1C1", "label_pos": (69.5, 45.8)
+        },
+        "Toshkent": {
+            "path": [(69.5,39.5),(71,39),(72,39.5),(71.5,40.5),(70,40.5)],
+            "color": "#EF9F27", "label_pos": (70.5, 39.8)
+        },
+        "Guliston": {
+            "path": [(71.5,40.5),(72,39.5),(73,40),(72.5,41.5),(71,41)],
+            "color": "#EF9F27", "label_pos": (72, 40.5)
+        },
+        "Namangan": {
+            "path": [(71,39),(72.5,38.5),(74,39),(73.5,40),(73,40),(72,39.5)],
+            "color": "#EF9F27", "label_pos": (72.5, 39.2)
+        },
+        "Andijon": {
+            "path": [(73.5,40),(74,39),(75.5,39.5),(76,40.5),(74.5,40.5)],
+            "color": "#EF9F27", "label_pos": (74.5, 39.9)
+        },
+        "Farg'ona": {
+            "path": [(72.5,41.5),(73,40),(74.5,40.5),(76,40.5),(76,42),(74,42.5),(72.5,42)],
+            "color": "#EF9F27", "label_pos": (74, 41.3)
+        },
     }
 
-    for city_name, pos in CITY_POS_MAP.items():
-        info = cities_data.get(city_name, {})
-        cx = map_x + pos[0]
-        cy = map_y + pos[1]
+    cities_data = day_data.get("cities", {})
 
-        # Doira
+    # Viloyatlarni chizish
+    for city_name, region in REGIONS.items():
+        # Haroratga qarab rang
+        info = cities_data.get(city_name, {})
         tmax = info.get("temp_max")
         if tmax is not None:
-            clr = get_temp_color(tmax)
-            draw.ellipse([(cx-12, cy-12), (cx+12, cy+12)], fill=clr, outline="#FFFFFF", width=2)
-            # Harorat raqami
-            t_text = str(tmax)
-            bbox = draw.textbbox((0, 0), t_text, font=font_temp_sm)
-            tw = bbox[2] - bbox[0]
-            draw.text((cx - tw//2, cy - 7), t_text, fill="#FFFFFF", font=font_temp_sm)
+            fill_color = get_temp_color_map(tmax)
         else:
-            draw.ellipse([(cx-8, cy-8), (cx+8, cy+8)], fill="#B0BEC5", outline="#FFFFFF", width=1)
+            fill_color = region["color"]
 
-        # Shahar nomi (pastda)
-        short_name = city_name[:5] if len(city_name) > 5 else city_name
-        bbox = draw.textbbox((0, 0), short_name, font=font_legend)
+        # Poligon koordinatalari
+        polygon = [svg_to_px(x, y) for x, y in region["path"]]
+        draw.polygon(polygon, fill=fill_color, outline="#FFFFFF")
+
+    # Viloyat nomlari va harorat
+    for city_name, region in REGIONS.items():
+        info = cities_data.get(city_name, {})
+        tmax = info.get("temp_max")
+        lx, ly = svg_to_px(*region["label_pos"])
+
+        # Shahar nomi
+        short = city_name[:6] if len(city_name) > 6 else city_name
+        bbox = draw.textbbox((0, 0), short, font=font_legend)
         nw = bbox[2] - bbox[0]
-        draw.text((cx - nw//2, cy + 14), short_name, fill=TEXT_DARK, font=font_legend)
+        draw.text((lx - nw//2, ly - 5), short, fill="#1a1a1a", font=font_legend)
+
+        # Harorat (agar mavjud)
+        if tmax is not None:
+            t_str = f"{tmax}\u00b0"
+            bbox2 = draw.textbbox((0, 0), t_str, font=font_city)
+            tw = bbox2[2] - bbox2[0]
+            draw.text((lx - tw//2, ly + 7), t_str, fill="#FFFFFF", font=font_city)
 
     # Xarita sarlavhasi
-    draw.text((map_x + 10, map_y + 5), "O'ZBEKISTON", fill=HEADER_COLOR, font=get_font(11, bold=True))
+    draw.text((map_x + 10, map_y + 5), "O\u2018ZBEKISTON", fill=HEADER_COLOR, font=get_font(11, bold=True))
 
     # === O'NG PANEL: 14 VILOYAT KARTOCHKALARI ===
     panel_x = map_x + map_w + 20
