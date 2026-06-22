@@ -1,331 +1,204 @@
-// ============================================
-// GIDROMETEOROLOGIYA XIZMATI — PROGNOZ TIZIMI
-// ============================================
+/**
+ * Ob-havo prognozi — Asosiy ilova
+ */
 
-const CITIES = [
-    "Toshkent", "Samarqand", "Buxoro", "Namangan",
-    "Andijon", "Farg'ona", "Qarshi", "Nukus",
-    "Navoiy", "Termiz", "Jizzax", "Urganch",
-    "Guliston", "Shahrisabz"
+// Shaharlar ro'yxati
+const CITY_LIST = [
+    "Toshkent", "Samarqand", "Buxoro", "Namangan", "Andijon",
+    "Farg'ona", "Qarshi", "Nukus", "Navoiy", "Termiz",
+    "Jizzax", "Urganch", "Guliston"
 ];
 
-const WEATHER_TYPES = [
-    { code: "ochiq",          label: "Havo ochiq" },
-    { code: "qisman_bulutli", label: "Qisman bulutli" },
-    { code: "bulutli",        label: "Bulutli" },
-    { code: "tuman",          label: "Tuman" },
-    { code: "yomgir",         label: "Yomg\u2018ir" },
-    { code: "jala",           label: "Jala" },
-    { code: "momaqaldiroq",   label: "Momaqaldiroq" },
-    { code: "qor",            label: "Qor" },
-    { code: "dol",            label: "Do\u2018l" },
-    { code: "chang_boroni",   label: "Chang bo\u2018roni" },
-    { code: "qor_boroni",     label: "Qor bo\u2018roni" }
+// Ob-havo turlari
+const WEATHER_OPTIONS = [
+    { value: "ochiq", label: "Ochiq (quyoshli)" },
+    { value: "qisman_bulutli", label: "Qisman bulutli" },
+    { value: "bulutli", label: "Bulutli" },
+    { value: "yomgir", label: "Yomg'ir" },
+    { value: "jala", label: "Jala" },
+    { value: "momaqaldiroq", label: "Momaqaldiroq" },
+    { value: "qor", label: "Qor" },
+    { value: "tuman", label: "Tuman" },
+    { value: "dol", label: "Do'l" },
+    { value: "chang_boroni", label: "Chang bo'roni" },
+    { value: "qor_boroni", label: "Qor bo'roni" }
 ];
 
-const DAYS = ["yakshanba","dushanba","seshanba","chorshanba","payshanba","juma","shanba"];
-const MONTHS = ["yanvar","fevral","mart","aprel","may","iyun","iyul","avgust","sentabr","oktabr","noyabr","dekabr"];
+// O'zbek oy nomlari
+const MONTHS_UZ = ["yanvar", "fevral", "mart", "aprel", "may", "iyun",
+    "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
+const DAYS_UZ = ["yakshanba", "dushanba", "seshanba", "chorshanba",
+    "payshanba", "juma", "shanba"];
 
-var forecastData = { days: [
-    { date: null, comment: "", cities: {} },
-    { date: null, comment: "", cities: {} },
-    { date: null, comment: "", cities: {} }
-]};
-var currentDay = 0;
+// Namuna ma'lumotlari (yozgi prognoz)
+const SAMPLE_DATA = {
+    "Toshkent": { temp_min: 22, temp_max: 38, weather: "ochiq" },
+    "Samarqand": { temp_min: 18, temp_max: 35, weather: "qisman_bulutli" },
+    "Buxoro": { temp_min: 24, temp_max: 42, weather: "ochiq" },
+    "Namangan": { temp_min: 20, temp_max: 36, weather: "qisman_bulutli" },
+    "Andijon": { temp_min: 19, temp_max: 34, weather: "yomgir" },
+    "Farg'ona": { temp_min: 20, temp_max: 37, weather: "jala" },
+    "Qarshi": { temp_min: 23, temp_max: 43, weather: "ochiq" },
+    "Nukus": { temp_min: 20, temp_max: 40, weather: "ochiq" },
+    "Navoiy": { temp_min: 22, temp_max: 41, weather: "qisman_bulutli" },
+    "Termiz": { temp_min: 26, temp_max: 45, weather: "ochiq" },
+    "Jizzax": { temp_min: 20, temp_max: 37, weather: "bulutli" },
+    "Urganch": { temp_min: 21, temp_max: 39, weather: "ochiq" },
+    "Guliston": { temp_min: 21, temp_max: 37, weather: "qisman_bulutli" }
+};
 
-document.addEventListener("DOMContentLoaded", function() {
-    initDates();
-    buildTable();
-    bindEvents();
-});
+let currentSvgContent = '';
 
-function initDates() {
-    var today = new Date();
-    for (var i = 0; i < 3; i++) {
-        var d = new Date(today);
-        d.setDate(d.getDate() + i);
-        forecastData.days[i].date = d;
-    }
-    document.getElementById("currentDate").textContent = formatDate(today);
-    updateDayNav();
-}
-
-function formatDate(d) {
-    return d.getDate() + " " + MONTHS[d.getMonth()] + " " + d.getFullYear() + ", " + DAYS[d.getDay()];
-}
-
-function updateDayNav() {
-    var labels = ["I kun","II kun","III kun"];
-    var btns = document.querySelectorAll("#inputSection .day-btn");
-    btns.forEach(function(btn, i) {
-        var d = forecastData.days[i].date;
-        if (d) btn.textContent = labels[i] + " \u2014 " + d.getDate() + "." + String(d.getMonth()+1).padStart(2,"0");
-    });
-}
-
-
+// ===== JADVAL YARATISH =====
 function buildTable() {
-    var tbody = document.getElementById("tableBody");
-    tbody.innerHTML = "";
-    var cities = forecastData.days[currentDay].cities;
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
 
-    CITIES.forEach(function(name) {
-        var d = cities[name] || {};
-        var row = document.createElement("tr");
-        var opts = WEATHER_TYPES.map(function(w) {
-            return '<option value="' + w.code + '"' + (d.weather === w.code ? ' selected' : '') + '>' + w.label + '</option>';
-        }).join("");
+    CITY_LIST.forEach(city => {
+        const tr = document.createElement('tr');
+        
+        // Shahar nomi
+        const tdCity = document.createElement('td');
+        tdCity.textContent = city;
+        tdCity.dataset.city = city;
+        tr.appendChild(tdCity);
 
-        row.innerHTML =
-            '<td>' + name + '</td>' +
-            '<td><input type="number" data-city="' + name + '" data-field="temp_min" value="' + (d.temp_min != null ? d.temp_min : '') + '" step="1" min="-40" max="55"></td>' +
-            '<td><input type="number" data-city="' + name + '" data-field="temp_max" value="' + (d.temp_max != null ? d.temp_max : '') + '" step="1" min="-40" max="55"></td>' +
-            '<td><input type="number" data-city="' + name + '" data-field="wind" value="' + (d.wind != null ? d.wind : '') + '" step="1" min="0" max="50"></td>' +
-            '<td><input type="number" data-city="' + name + '" data-field="precip" value="' + (d.precip != null ? d.precip : '') + '" step="0.1" min="0" max="200"></td>' +
-            '<td><select data-city="' + name + '" data-field="weather">' + opts + '</select></td>';
-        tbody.appendChild(row);
-    });
+        // Temp min
+        const tdMin = document.createElement('td');
+        tdMin.innerHTML = `<input type="number" id="tmin_${city}" min="-30" max="55" step="1" placeholder="min">`;
+        tr.appendChild(tdMin);
 
-    document.getElementById("comment").value = forecastData.days[currentDay].comment || "";
-    tbody.querySelectorAll("input, select").forEach(function(el) {
-        el.addEventListener("change", saveField);
-        // Validatsiya — ogohlantirish ranglari
-        el.addEventListener("input", function() {
-            if (this.type === "number" && this.value !== "") {
-                var v = parseFloat(this.value);
-                var field = this.dataset.field;
-                if (field === "temp_max" && v >= 45) this.style.background = "#ffcdd2";
-                else if (field === "temp_max" && v >= 40) this.style.background = "#fff9c4";
-                else if (field === "wind" && v >= 15) this.style.background = "#ffcdd2";
-                else if (field === "wind" && v >= 10) this.style.background = "#fff9c4";
-                else this.style.background = "";
-            }
+        // Temp max
+        const tdMax = document.createElement('td');
+        tdMax.innerHTML = `<input type="number" id="tmax_${city}" min="-30" max="55" step="1" placeholder="max">`;
+        tr.appendChild(tdMax);
+
+        // Weather type
+        const tdWeather = document.createElement('td');
+        let selectHtml = `<select id="weather_${city}">`;
+        WEATHER_OPTIONS.forEach(opt => {
+            selectHtml += `<option value="${opt.value}">${opt.label}</option>`;
         });
+        selectHtml += '</select>';
+        tdWeather.innerHTML = selectHtml;
+        tr.appendChild(tdWeather);
+
+        tbody.appendChild(tr);
     });
 }
 
-function saveField(e) {
-    var city = e.target.dataset.city;
-    var field = e.target.dataset.field;
-    if (!forecastData.days[currentDay].cities[city])
-        forecastData.days[currentDay].cities[city] = {};
-    var val;
-    if (e.target.type === "number") {
-        val = e.target.value === "" ? null : parseFloat(e.target.value);
-    } else {
-        val = e.target.value;
-    }
-    forecastData.days[currentDay].cities[city][field] = val;
-}
+// ===== MA'LUMOTLARNI YIGISH =====
+function collectData() {
+    const data = {};
+    CITY_LIST.forEach(city => {
+        const tmin = document.getElementById(`tmin_${city}`).value;
+        const tmax = document.getElementById(`tmax_${city}`).value;
+        const weather = document.getElementById(`weather_${city}`).value;
 
-function saveComment() {
-    forecastData.days[currentDay].comment = document.getElementById("comment").value;
-}
-
-
-function bindEvents() {
-    document.querySelectorAll("#inputSection .day-btn").forEach(function(btn) {
-        btn.addEventListener("click", function() {
-            saveComment();
-            currentDay = parseInt(this.dataset.day);
-            document.querySelectorAll("#inputSection .day-btn").forEach(function(b, i) {
-                b.classList.toggle("active", i === currentDay);
-            });
-            buildTable();
-        });
-    });
-
-    document.getElementById("comment").addEventListener("input", function() {
-        forecastData.days[currentDay].comment = this.value;
-    });
-
-    document.getElementById("btnGenerate").addEventListener("click", generate);
-    document.getElementById("btnSample").addEventListener("click", loadSample);
-
-    document.getElementById("btnCopyPrev").addEventListener("click", function() {
-        if (currentDay === 0) { alert("I kun uchun oldingi kun mavjud emas."); return; }
-        var prevCities = forecastData.days[currentDay - 1].cities;
-        if (Object.keys(prevCities).length === 0) { alert("Oldingi kunda ma'lumot yo'q."); return; }
-        forecastData.days[currentDay].cities = JSON.parse(JSON.stringify(prevCities));
-        buildTable();
-    });
-
-    document.getElementById("btnClear").addEventListener("click", function() {
-        if (!confirm("Barcha ma'lumotlar o'chirilsinmi?")) return;
-        forecastData.days.forEach(function(d) { d.cities = {}; d.comment = ""; });
-        buildTable();
-    });
-
-    document.getElementById("btnBack").addEventListener("click", function() {
-        document.getElementById("inputSection").style.display = "";
-        document.getElementById("resultSection").style.display = "none";
-    });
-
-    document.getElementById("btnCopy").addEventListener("click", function() {
-        var text = document.getElementById("telegramText").textContent;
-        navigator.clipboard.writeText(text).then(function() {
-            document.getElementById("btnCopy").textContent = "Nusxa olindi!";
-            setTimeout(function() { document.getElementById("btnCopy").textContent = "Nusxa olish"; }, 2000);
-        });
-    });
-
-    document.getElementById("btnDownload").addEventListener("click", function() {
-        exportMapToPNG(function(url) {
-            if (url) { var a = document.createElement("a"); a.href = url; a.download = "prognoz.png"; a.click(); }
-            else { alert("Xaritani PNG formatiga aylantirish imkoni bo'lmadi."); }
-        });
-    });
-
-    document.getElementById("btnPdf").addEventListener("click", function() {
-        var data = window._resultData;
-        if (!data || !data.forecast_id) return;
-        fetch("/api/export-pdf/" + data.forecast_id)
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            if (res.pdf_url) {
-                var a = document.createElement("a");
-                a.href = res.pdf_url; a.download = "prognoz.pdf"; a.click();
-            }
-        });
-    });
-
-    document.getElementById("btnTelegram").addEventListener("click", function() {
-        var data = window._resultData;
-        if (!data || !data.forecast_id) return;
-        if (!confirm("Telegram kanalga yuborilsinmi?")) return;
-        fetch("/api/publish-telegram/" + data.forecast_id, { method: "POST" })
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            if (res.status === "sent") alert("Telegram ga muvaffaqiyatli yuborildi!");
-            else alert("Xatolik: " + JSON.stringify(res));
-        });
-    });
-
-    document.querySelectorAll(".result-day-nav .day-btn").forEach(function(btn) {
-        btn.addEventListener("click", function() {
-            var day = parseInt(this.dataset.day);
-            document.querySelectorAll(".result-day-nav .day-btn").forEach(function(b, i) {
-                b.classList.toggle("active", i === day);
-            });
-            showDayResult(day);
-        });
-    });
-}
-
-
-function generate() {
-    saveComment();
-    var hasData = false;
-    for (var i = 0; i < forecastData.days.length; i++) {
-        var cities = forecastData.days[i].cities;
-        for (var c in cities) {
-            if (cities[c] && cities[c].temp_max != null) { hasData = true; break; }
+        if (tmax !== '') {
+            data[city] = {
+                temp_min: tmin !== '' ? parseInt(tmin) : null,
+                temp_max: parseInt(tmax),
+                weather: weather
+            };
         }
-        if (hasData) break;
+    });
+    return data;
+}
+
+// ===== NAMUNA YUKLASH =====
+function loadSampleData() {
+    CITY_LIST.forEach(city => {
+        if (SAMPLE_DATA[city]) {
+            document.getElementById(`tmin_${city}`).value = SAMPLE_DATA[city].temp_min;
+            document.getElementById(`tmax_${city}`).value = SAMPLE_DATA[city].temp_max;
+            document.getElementById(`weather_${city}`).value = SAMPLE_DATA[city].weather;
+        }
+    });
+}
+
+// ===== SANA FORMATLASH =====
+function formatDate(dateStr) {
+    if (!dateStr) {
+        const now = new Date();
+        const day = now.getDate();
+        const month = MONTHS_UZ[now.getMonth()];
+        const year = now.getFullYear();
+        const dayName = DAYS_UZ[now.getDay()];
+        return `${day} ${month} ${year} yil, ${dayName}`;
     }
-    if (!hasData) {
-        alert("Kamida bitta shahar uchun harorat kiriting.\n\nYoki \"Namuna yuklash\" tugmasini bosing.");
+    const d = new Date(dateStr);
+    const day = d.getDate();
+    const month = MONTHS_UZ[d.getMonth()];
+    const year = d.getFullYear();
+    const dayName = DAYS_UZ[d.getDay()];
+    return `${day} ${month} ${year} yil, ${dayName}`;
+}
+
+// ===== XARITA GENERATSIYA =====
+function generateMap() {
+    const weatherData = collectData();
+    
+    if (Object.keys(weatherData).length === 0) {
+        alert("Iltimos, kamida bitta shahar uchun harorat kiriting!");
         return;
     }
 
-    var payload = forecastData.days.map(function(d, i) {
-        return {
-            date: d.date ? d.date.toISOString().slice(0, 10) : null,
-            day_index: i,
-            comment: d.comment,
-            cities: d.cities
-        };
-    });
+    const dateInput = document.getElementById('forecastDate').value;
+    const dateStr = formatDate(dateInput);
 
-    document.getElementById("btnGenerate").textContent = "Yaratilmoqda...";
-    document.getElementById("btnGenerate").disabled = true;
+    // SVG yaratish
+    currentSvgContent = renderWeatherMap(weatherData, dateStr, "OB-HAVO PROGNOZI");
 
-    fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ days: payload })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) {
-            document.getElementById("inputSection").style.display = "none";
-            document.getElementById("resultSection").style.display = "";
-            window._resultData = data;
-            showDayResult(0);
-        } else {
-            alert("Xatolik: " + (data.error || "Noma'lum xato"));
-        }
-    })
-    .catch(function(err) {
-        alert("Server bilan aloqa xatosi: " + err.message);
-    })
-    .finally(function() {
-        document.getElementById("btnGenerate").textContent = "Xarita va prognozni shakllantirish";
-        document.getElementById("btnGenerate").disabled = false;
-    });
+    // Ekranga chiqarish
+    const container = document.getElementById('mapContainer');
+    container.innerHTML = currentSvgContent;
+
+    // Result panelni ko'rsatish
+    document.getElementById('resultPanel').style.display = 'block';
+
+    // Scroll to result
+    document.getElementById('resultPanel').scrollIntoView({ behavior: 'smooth' });
 }
 
-function showDayResult(dayIndex) {
-    var data = window._resultData;
-    if (!data) return;
-    var cities = forecastData.days[dayIndex].cities;
+// ===== YUKLAB OLISH =====
+function downloadPng() {
+    const svgElement = document.querySelector('#mapContainer svg');
+    if (!svgElement) return;
 
-    // Xarita
-    initForecastMap("forecastMapContainer");
-    setTimeout(function() { renderCityMarkers(cities); forecastMap.invalidateSize(); }, 400);
+    const dateInput = document.getElementById('forecastDate').value;
+    const d = dateInput ? new Date(dateInput) : new Date();
+    const filename = `ob-havo-prognozi_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.png`;
 
-    // Telegram
-    document.getElementById("telegramText").textContent = data.telegram[dayIndex];
-
-    // === O'NG PANEL ===
-    var temps=[],winds=[],precips=[],warnings=[];
-    for(var c in cities){var inf=cities[c];if(!inf||inf.temp_max==null)continue;
-        temps.push(inf.temp_max);if(inf.temp_min!=null)temps.push(inf.temp_min);
-        if(inf.wind)winds.push(inf.wind);if(inf.precip&&inf.precip>0)precips.push(inf.precip);
-        if(inf.temp_max>=40)warnings.push({type:"issiqlik",city:c,val:inf.temp_max});
-        if(inf.wind>=15)warnings.push({type:"shamol",city:c,val:inf.wind});
-        if(inf.weather==="momaqaldiroq")warnings.push({type:"momaqaldiroq",city:c});
-        if(inf.precip>=10)warnings.push({type:"sel",city:c,val:inf.precip});}
-
-    var tMin=temps.length?Math.min.apply(null,temps):"—";
-    var tMax=temps.length?Math.max.apply(null,temps):"—";
-    var wMax=winds.length?Math.max.apply(null,winds):0;
-
-    document.getElementById("summaryBlock").innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;"><div style="background:#fff3e0;padding:10px;border-radius:6px;"><div style="font-size:11px;color:#e65100;">Harorat</div><div style="font-size:18px;font-weight:700;color:#bf360c;">'+tMin+'\u2013'+tMax+'\u00b0C</div></div><div style="background:#e3f2fd;padding:10px;border-radius:6px;"><div style="font-size:11px;color:#1565c0;">Shamol</div><div style="font-size:18px;font-weight:700;color:#0d47a1;">'+(wMax>0?"\u2264"+wMax+" m/s":"sust")+'</div></div><div style="background:#e8f5e9;padding:10px;border-radius:6px;"><div style="font-size:11px;color:#2e7d32;">Yog\u2018ingarchilik</div><div style="font-size:15px;font-weight:700;color:#1b5e20;">'+(precips.length?precips.length+" viloyatda":"Kutilmaydi")+'</div></div><div style="background:'+(warnings.length?"#ffebee":"#e8f5e9")+';padding:10px;border-radius:6px;"><div style="font-size:11px;color:'+(warnings.length?"#c62828":"#2e7d32")+';">Xavf</div><div style="font-size:15px;font-weight:700;color:'+(warnings.length?"#b71c1c":"#2e7d32")+';">'+(warnings.length?warnings.length+" ogohlantirish":"Past")+'</div></div></div>';
-
-    // Jadval
-    var sorted=Object.keys(cities).filter(function(c){return cities[c]&&cities[c].temp_max!=null;}).sort(function(a,b){return cities[b].temp_max-cities[a].temp_max;});
-    var HCLR={"ochiq":"#4caf50","qisman_bulutli":"#8bc34a","bulutli":"#9e9e9e","yomgir":"#2196f3","jala":"#03a9f4","momaqaldiroq":"#ff9800","qor":"#90caf9","dol":"#f44336","tuman":"#bdbdbd","chang_boroni":"#795548","qor_boroni":"#607d8b"};
-    var HLBL={"ochiq":"Havo ochiq","qisman_bulutli":"Qisman bulutli","bulutli":"Bulutli","yomgir":"Yomg\u2018ir","jala":"Jala","momaqaldiroq":"Momaqaldiroq","qor":"Qor","dol":"Do\u2018l","tuman":"Tuman","chang_boroni":"Chang bo\u2018roni","qor_boroni":"Qor bo\u2018roni"};
-    var tbl='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#f5f5f5;"><th style="text-align:left;padding:5px;">Viloyat</th><th style="padding:5px;">Harorat</th><th style="padding:5px;">Hodisa</th></tr></thead><tbody>';
-    sorted.forEach(function(c){var inf=cities[c];var w=inf.weather||"ochiq";tbl+='<tr style="border-bottom:1px solid #eee;"><td style="padding:4px 5px;">'+c+'</td><td style="padding:4px;text-align:center;font-weight:700;color:'+getTempColorHex(inf.temp_max)+';">'+(inf.temp_min||"")+'\u2013'+inf.temp_max+'\u00b0</td><td style="padding:4px;text-align:center;color:'+(HCLR[w]||"#666")+';font-weight:600;">'+(HLBL[w]||w)+'</td></tr>';});
-    tbl+='</tbody></table>';
-    document.getElementById("regionTable").innerHTML='<h4 style="font-size:12px;font-weight:700;color:#333;margin-bottom:4px;">VILOYATLAR BO\u2018YICHA</h4>'+tbl;
-
-    // Ogohlantirishlar
-    var wHtml="";
-    if(warnings.length){var WS={"issiqlik":"background:#fff3e0;border-left:3px solid #e65100;","shamol":"background:#e3f2fd;border-left:3px solid #1565c0;","momaqaldiroq":"background:#fff8e1;border-left:3px solid #f9a825;","sel":"background:#e8f5e9;border-left:3px solid #2e7d32;"};
-    var WT={"issiqlik":"\ud83d\udd25 Issiqlik","shamol":"\ud83d\udca8 Shamol","momaqaldiroq":"\u26c8\ufe0f Momaqaldiroq","sel":"\ud83c\udf0a Sel"};
-    warnings.forEach(function(w){wHtml+='<div style="'+(WS[w.type]||"")+'padding:6px 10px;border-radius:4px;margin-bottom:4px;font-size:11px;"><b>'+(WT[w.type]||w.type)+'</b> \u2014 '+w.city+(w.val?" ("+w.val+")":"")+'</div>';});}
-    document.getElementById("warningsBlock").innerHTML=wHtml?'<h4 style="font-size:12px;font-weight:700;color:#c62828;margin-bottom:4px;">OGOHLANTIRISHLAR</h4>'+wHtml:"";
+    downloadMapAsPng(svgElement, filename);
 }
 
+function downloadSvg() {
+    if (!currentSvgContent) return;
 
-function loadSample() {
-    var s = [
-        { comment: "Respublika hududida harorat mavsumiy me'yordan 3\u20135\u00b0C yuqori saqlanadi. Farg'ona vodiysida mahalliy momaqaldiroqli yog'ingarchilik ehtimoli bor.",
-          cities: { "Toshkent":{temp_min:22,temp_max:36,wind:4,precip:0,weather:"ochiq"}, "Samarqand":{temp_min:18,temp_max:33,wind:3,precip:0,weather:"qisman_bulutli"}, "Buxoro":{temp_min:24,temp_max:40,wind:5,precip:0,weather:"ochiq"}, "Namangan":{temp_min:20,temp_max:35,wind:3,precip:0,weather:"qisman_bulutli"}, "Andijon":{temp_min:21,temp_max:34,wind:3,precip:2,weather:"jala"}, "Farg'ona":{temp_min:22,temp_max:38,wind:2,precip:0,weather:"ochiq"}, "Qarshi":{temp_min:23,temp_max:41,wind:4,precip:0,weather:"ochiq"}, "Nukus":{temp_min:20,temp_max:38,wind:6,precip:0,weather:"qisman_bulutli"}, "Navoiy":{temp_min:21,temp_max:39,wind:5,precip:0,weather:"ochiq"}, "Termiz":{temp_min:26,temp_max:44,wind:3,precip:0,weather:"ochiq"}, "Jizzax":{temp_min:20,temp_max:36,wind:4,precip:0,weather:"bulutli"}, "Urganch":{temp_min:21,temp_max:37,wind:5,precip:0,weather:"qisman_bulutli"}, "Guliston":{temp_min:21,temp_max:35,wind:3,precip:0,weather:"qisman_bulutli"}, "Shahrisabz":{temp_min:19,temp_max:34,wind:2,precip:0,weather:"bulutli"} } },
-        { comment: "Shimoliy-sharqiy hududlarda momaqaldiroqli yog'ingarchilik. Xorazm, Qoraqalpog'istonda shamol 15\u201318 m/s gacha kuchayadi.",
-          cities: { "Toshkent":{temp_min:21,temp_max:34,wind:5,precip:3,weather:"yomgir"}, "Samarqand":{temp_min:17,temp_max:31,wind:4,precip:5,weather:"yomgir"}, "Buxoro":{temp_min:23,temp_max:38,wind:6,precip:0,weather:"bulutli"}, "Namangan":{temp_min:19,temp_max:33,wind:5,precip:8,weather:"momaqaldiroq"}, "Andijon":{temp_min:20,temp_max:32,wind:4,precip:10,weather:"momaqaldiroq"}, "Farg'ona":{temp_min:21,temp_max:35,wind:3,precip:5,weather:"yomgir"}, "Qarshi":{temp_min:22,temp_max:39,wind:5,precip:0,weather:"qisman_bulutli"}, "Nukus":{temp_min:19,temp_max:36,wind:8,precip:0,weather:"chang_boroni"}, "Navoiy":{temp_min:20,temp_max:37,wind:6,precip:0,weather:"bulutli"}, "Termiz":{temp_min:25,temp_max:42,wind:4,precip:0,weather:"ochiq"}, "Jizzax":{temp_min:19,temp_max:34,wind:4,precip:2,weather:"jala"}, "Urganch":{temp_min:20,temp_max:35,wind:7,precip:0,weather:"chang_boroni"}, "Guliston":{temp_min:20,temp_max:33,wind:4,precip:1,weather:"jala"}, "Shahrisabz":{temp_min:18,temp_max:32,wind:3,precip:4,weather:"yomgir"} } },
-        { comment: "Ob-havo barqarorlashadi. Yog'ingarchilik kutilmaydi.",
-          cities: { "Toshkent":{temp_min:20,temp_max:32,wind:3,precip:0,weather:"qisman_bulutli"}, "Samarqand":{temp_min:16,temp_max:30,wind:2,precip:0,weather:"qisman_bulutli"}, "Buxoro":{temp_min:22,temp_max:37,wind:4,precip:0,weather:"qisman_bulutli"}, "Namangan":{temp_min:18,temp_max:31,wind:3,precip:0,weather:"bulutli"}, "Andijon":{temp_min:19,temp_max:30,wind:2,precip:0,weather:"bulutli"}, "Farg'ona":{temp_min:20,temp_max:33,wind:2,precip:0,weather:"qisman_bulutli"}, "Qarshi":{temp_min:21,temp_max:38,wind:3,precip:0,weather:"ochiq"}, "Nukus":{temp_min:18,temp_max:35,wind:5,precip:0,weather:"qisman_bulutli"}, "Navoiy":{temp_min:19,temp_max:36,wind:4,precip:0,weather:"qisman_bulutli"}, "Termiz":{temp_min:24,temp_max:41,wind:3,precip:0,weather:"ochiq"}, "Jizzax":{temp_min:18,temp_max:33,wind:3,precip:0,weather:"qisman_bulutli"}, "Urganch":{temp_min:19,temp_max:34,wind:4,precip:0,weather:"bulutli"}, "Guliston":{temp_min:19,temp_max:32,wind:3,precip:0,weather:"qisman_bulutli"}, "Shahrisabz":{temp_min:17,temp_max:31,wind:2,precip:0,weather:"qisman_bulutli"} } }
-    ];
-    for (var i = 0; i < 3; i++) {
-        forecastData.days[i].cities = s[i].cities;
-        forecastData.days[i].comment = s[i].comment;
-    }
+    const dateInput = document.getElementById('forecastDate').value;
+    const d = dateInput ? new Date(dateInput) : new Date();
+    const filename = `ob-havo-prognozi_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.svg`;
+
+    downloadMapAsSvg(currentSvgContent, filename);
+}
+
+// ===== INITIALIZATION =====
+document.addEventListener('DOMContentLoaded', function() {
+    // Sana ko'rsatish
+    const now = new Date();
+    document.getElementById('currentDate').textContent = formatDate();
+
+    // Bugungi sanani default qilish
+    const dateInput = document.getElementById('forecastDate');
+    dateInput.value = now.toISOString().split('T')[0];
+
+    // Jadvalni yaratish
     buildTable();
-}
 
-
-
+    // Event listeners
+    document.getElementById('btnGenerate').addEventListener('click', generateMap);
+    document.getElementById('btnLoadSample').addEventListener('click', loadSampleData);
+    document.getElementById('btnDownloadPng').addEventListener('click', downloadPng);
+    document.getElementById('btnDownloadSvg').addEventListener('click', downloadSvg);
+});
