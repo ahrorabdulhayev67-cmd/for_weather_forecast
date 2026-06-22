@@ -366,6 +366,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 8px;
 }
 #uzmap {
     width: 100%;
@@ -374,30 +375,27 @@ body {
     cursor: pointer;
 }
 .reg-path {
-    fill: #cde4f6;
     stroke: #fff;
-    stroke-width: 0.5px;
+    stroke-width: 0.6px;
     stroke-linejoin: round;
-    transition: opacity 0.15s, stroke-width 0.15s, fill 0.3s;
+    transition: opacity 0.15s, stroke-width 0.15s;
     cursor: pointer;
 }
 .reg-path:hover {
-    opacity: 0.8;
-    stroke-width: 1px;
-    stroke: var(--primary);
+    opacity: 0.75;
+    stroke-width: 1.2px;
 }
 .reg-path.selected {
-    stroke: var(--primary-dark);
-    stroke-width: 1.4px;
+    stroke: #0B3D8F;
+    stroke-width: 1.5px;
     opacity: 1;
-    filter: brightness(1.05);
 }
-.reg-label {
-    font-size: 0.55px;
-    fill: #1a2332;
-    font-family: var(--font-sans);
+.rl {
+    font-size: 0.6px;
+    fill: #1a1a1a;
+    font-family: sans-serif;
     pointer-events: none;
-    font-weight: 600;
+    font-weight: 500;
 }
 
 /* MAP LEGEND */
@@ -421,6 +419,12 @@ body {
     border-radius: 2px;
     display: inline-block;
     border: 1px solid rgba(0,0,0,0.08);
+}
+.hint {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    text-align: center;
+    margin-top: 4px;
 }
 
 /* REGION INFO */

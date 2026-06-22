@@ -359,13 +359,12 @@ function highlightMapRegion(cityName) {
 
 function getTempColor(t) {
     if (t >= 42) return "#c62828";
-    if (t >= 40) return "#E85D5D";
-    if (t >= 38) return "#EF7B45";
-    if (t >= 35) return "#EF9F27";
-    if (t >= 32) return "#FAC775";
-    if (t >= 28) return "#A8D8A8";
+    if (t >= 40) return "#F7C1C1";
+    if (t >= 37) return "#EF9F27";
+    if (t >= 34) return "#FAC775";
+    if (t >= 30) return "#FAC775";
     if (t >= 25) return "#85B7EB";
-    if (t >= 20) return "#9ECAE1";
+    if (t >= 18) return "#85B7EB";
     if (t >= 10) return "#B8D4E8";
     return "#D4E8F5";
 }
