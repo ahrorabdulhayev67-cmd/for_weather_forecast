@@ -16,6 +16,13 @@ try:
 except ImportError:
     HAS_MAP_RENDERER = False
 
+# card_renderer — PIL asosida kartochka generatori
+try:
+    from card_renderer import render_forecast_card
+    HAS_CARD_RENDERER = True
+except ImportError:
+    HAS_CARD_RENDERER = False
+
 # PDF va Telegram ixtiyoriy
 try:
     from pdf_export import export_forecast_pdf
@@ -88,6 +95,23 @@ def generate():
             if i < 3:
                 telegrams.append(build_telegram_text(day, i))
 
+        # Rasm generatsiya (card_renderer mavjud bo'lsa)
+        images = []
+        if HAS_CARD_RENDERER:
+            for i, day in enumerate(days):
+                if i >= 3:
+                    break
+                filename = f"prognoz_{forecast.id}_day{i+1}.png"
+                output_path = str(OUTPUT_DIR / filename)
+                render_forecast_card(day, output_path)
+                images.append(f"/static/output/{filename}")
+                if i == 0:
+                    forecast.image1_path = output_path
+                elif i == 1:
+                    forecast.image2_path = output_path
+                elif i == 2:
+                    forecast.image3_path = output_path
+
         db.session.add(forecast)
         db.session.commit()
 
@@ -95,6 +119,7 @@ def generate():
             "success": True,
             "telegram": telegrams,
             "forecast_id": forecast.id,
+            "images": images,
         })
 
     except Exception as e:

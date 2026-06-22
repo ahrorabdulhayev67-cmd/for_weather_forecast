@@ -260,6 +260,26 @@ function showResultPanel(days, serverResult) {
     updateResultDayTabs();
     renderResultForDay(0, days);
 
+    // Rasmlar ko'rsatish
+    var imagesBlock = document.getElementById("imagesBlock");
+    var imagesRow = document.getElementById("imagesRow");
+    if (serverResult.images && serverResult.images.length > 0) {
+        imagesBlock.style.display = "block";
+        imagesRow.innerHTML = "";
+        serverResult.images.forEach(function(url) {
+            var img = document.createElement("img");
+            img.src = url;
+            img.alt = "Prognoz kartochkasi";
+            img.addEventListener("click", function() {
+                window.open(url, "_blank");
+            });
+            imagesRow.appendChild(img);
+        });
+    } else {
+        imagesBlock.style.display = "none";
+    }
+
+    // Telegram matn
     var tgTexts = [];
     if (serverResult.telegram && serverResult.telegram.length) {
         tgTexts = serverResult.telegram;
@@ -586,6 +606,18 @@ function handleLoadLast() {
 
 // === PNG EKSPORT ===
 function handleExportPNG() {
+    // Agar server rasm generatsiya qilgan bo'lsa — birinchi rasmni yuklab olish
+    var imagesRow = document.getElementById("imagesRow");
+    var firstImg = imagesRow ? imagesRow.querySelector("img") : null;
+    if (firstImg && firstImg.src) {
+        var link = document.createElement("a");
+        link.href = firstImg.src;
+        link.download = "prognoz_kartochka.png";
+        link.click();
+        showToast("PNG yuklandi!", "success");
+        return;
+    }
+    // Fallback: SVG dan PNG
     var svg = document.getElementById("uzmap");
     if (!svg) return;
     var svgData = new XMLSerializer().serializeToString(svg);
@@ -599,9 +631,6 @@ function handleExportPNG() {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 50, 50, 1100, 600);
-        ctx.fillStyle = "#0B3D8F";
-        ctx.font = "bold 18px sans-serif";
-        ctx.fillText("O\u2018zgidromet \u2014 Ob-havo prognozi", 50, 30);
         var link = document.createElement("a");
         link.download = "prognoz_xarita.png";
         link.href = canvas.toDataURL("image/png");
