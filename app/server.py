@@ -30,6 +30,37 @@ except ImportError:
     HAS_TELEGRAM = False
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
+OUTPUT_DIR = Path("static/output")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Database init
+init_db(app)
+
+MONTHS_UZ = ["yanvar","fevral","mart","aprel","may","iyun",
+             "iyul","avgust","sentabr","oktabr","noyabr","dekabr"]
+DAYS_UZ = ["yakshanba","dushanba","seshanba","chorshanba",
+           "payshanba","juma","shanba"]
+
+WEATHER_LABELS = {
+    "ochiq": "havo ochiq",
+    "qisman_bulutli": "qisman bulutli",
+    "bulutli": "bulutli",
+    "tuman": "tuman",
+    "yomgir": "yomg'ir",
+    "jala": "jala",
+    "momaqaldiroq": "momaqaldiroq",
+    "qor": "qor",
+    "dol": "do'l",
+    "chang_boroni": "chang bo'roni",
+    "qor_boroni": "qor bo'roni",
+}
+
+WEATHER_EMOJI = {
+    "ochiq": "\u2600\ufe0f", "qisman_bulutli": "\u26c5", "bulutli": "\u2601\ufe0f",
+    "tuman": "\ud83c\udf2b", "yomgir": "\ud83c\udf27", "jala": "\ud83c\udf26",
+    "momaqaldiroq": "\u26c8", "qor": "\u2744\ufe0f", "dol": "\ud83c\udf28",
+    "chang_boroni": "\ud83d\udca8", "qor_boroni": "\ud83c\udf2c",
+}
 
 
 @app.route("/")
@@ -37,9 +68,84 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/static/<path:filename>")
-def serve_static(filename):
-    return send_from_directory("static", filename)
+@app.route("/api/generate", methods=["POST"])
+def generate():
+    """3 kunlik prognoz ma'lumotlarini saqlaydi va Telegram matnini qaytaradi."""
+    try:
+        data = request.get_json()
+        days = data.get("days", [])
+        if not days:
+            return jsonify({"success": False, "error": "Ma'lumot topilmadi"})
+
+        # Ma'lumotlar bazasiga saqlash
+        forecast = Forecast(created_by="sinoptik", status="published")
+        for i, day in enumerate(days):
+            if i < 3:
+                forecast.set_day_data(i, day)
+
+        telegrams = []
+        for i, day in enumerate(days):
+            if i < 3:
+                telegrams.append(build_telegram_text(day, i))
+
+        db.session.add(forecast)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "telegram": telegrams,
+            "forecast_id": forecast.id,
+        })
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
+def build_telegram_text(day_data, day_index):
+    """Telegram uchun formatlangan matn."""
+    labels = ["BUGUN", "ERTAGA", "INDINGA"]
+    date_str = day_data.get("date", "")
+    if date_str:
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+        header = f"{d.day} {MONTHS_UZ[d.month-1]}, {DAYS_UZ[d.weekday()]}"
+    else:
+        d = datetime.now() + timedelta(days=day_index)
+        header = f"{d.day} {MONTHS_UZ[d.month-1]}, {DAYS_UZ[d.weekday()]}"
+
+    lines = []
+    lines.append(f"\ud83c\udf24 OB-HAVO PROGNOZI \u2014 {labels[day_index]}")
+    lines.append(f"\ud83d\udcc5 {header}")
+    lines.append("\u2500" * 28)
+    lines.append("")
+
+    cities = day_data.get("cities", {})
+    for city_name, info in cities.items():
+        if not info or info.get("temp_max") is None:
+            continue
+        emoji = WEATHER_EMOJI.get(info.get("weather", ""), "")
+        tmin = info.get("temp_min", "")
+        tmax = info.get("temp_max", "")
+        wind = info.get("wind")
+        precip = info.get("precip")
+
+        line = f"{emoji} {city_name}: {tmin}\u00b0\u2026{tmax}\u00b0C"
+        if wind:
+            line += f", shamol {wind} m/s"
+        if precip and precip > 0:
+            line += f", yog'in {precip} mm"
+        lines.append(line)
+
+    comment = day_data.get("comment", "")
+    if comment:
+        lines.append("")
+        lines.append(f"\ud83d\udccb {comment}")
+
+    lines.append("")
+    lines.append("\u2500" * 28)
+    lines.append("\ud83d\udce1 Gidrometeorologiya xizmati")
+    lines.append("\ud83d\udd17 hydromet.uz")
+
+    return "\n".join(lines)
 
 
 # === API: Arxiv ===
