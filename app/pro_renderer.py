@@ -378,6 +378,7 @@ def render_pro_forecast(day_data, output_path, dpi=200):
         {"name": "Toshkent, Samarqand, Jizzax, Sirdaryo", "cities": ["Toshkent", "Samarqand", "Jizzax", "Guliston"]},
         {"name": "Qashqadaryo, Surxondaryo", "cities": ["Qarshi", "Termiz"]},
         {"name": "Andijon, Namangan, Farg'ona", "cities": ["Andijon", "Namangan", "Farg'ona"]},
+        {"name": "Tog' oldi va tog'li hududlar", "cities": ["Toshkent", "Namangan", "Farg'ona"]},
     ]
 
     # Jadval sarlavhasi

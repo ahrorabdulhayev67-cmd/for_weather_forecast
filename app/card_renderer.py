@@ -277,7 +277,7 @@ def render_forecast_card(day_data, output_path, dpi=150):
         {"name": "Toshkent, Samarqand,\nJizzax, Sirdaryo vil.", "cities": ["Toshkent", "Samarqand", "Jizzax", "Guliston"]},
         {"name": "Qashqadaryo,\nSurxondaryo", "cities": ["Qarshi", "Termiz"]},
         {"name": "Andijon, Namangan,\nFarg'ona", "cities": ["Andijon", "Namangan", "Farg'ona"]},
-        {"name": "Tog' oldi va tog'li\nhududlar", "cities": []},
+        {"name": "Tog' oldi va tog'li\nhududlar", "cities": ["Toshkent", "Namangan", "Farg'ona"]},
     ]
 
     def get_group_data(group):
