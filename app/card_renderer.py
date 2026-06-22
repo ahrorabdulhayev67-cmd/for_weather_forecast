@@ -21,8 +21,8 @@ from datetime import datetime
 import os
 
 # === KONFIGURATSIYA ===
-WIDTH = 1200
-HEIGHT = 900
+WIDTH = 1400
+HEIGHT = 750
 BG_COLOR = "#FFFFFF"
 HEADER_COLOR = "#0B3D8F"
 ACCENT_RED = "#C62828"
@@ -156,7 +156,7 @@ def render_forecast_card(day_data, output_path, dpi=150):
 
     # === CHAP PANEL: O'ZBEKISTON XARITASI (viloyat poligonlari) ===
     map_x, map_y = 15, y_start + 10
-    map_w, map_h = 440, 520
+    map_w, map_h = 480, 580
 
     # Xarita fon
     draw.rectangle([(map_x, map_y), (map_x + map_w, map_y + map_h)], fill="#DBEEFF", outline="#90CAF9", width=1)
@@ -262,66 +262,114 @@ def render_forecast_card(day_data, output_path, dpi=150):
     # Xarita sarlavhasi
     draw.text((map_x + 10, map_y + 5), "O\u2018ZBEKISTON", fill=HEADER_COLOR, font=get_font(11, bold=True))
 
-    # === O'NG PANEL: 14 VILOYAT KARTOCHKALARI ===
-    panel_x = map_x + map_w + 20
-    panel_y = y_start + 10
-    card_w = 165
-    card_h = 115
-    gap = 8
-    cols = 4
+    # === O'NG PANEL: GURUHLAR BO'YICHA PROGNOZ ===
+    # O'zgidromet Telegram formati: 8 ta hudud guruhi
+    panel_x = map_x + map_w + 15
+    panel_y = y_start + 5
+    panel_w = WIDTH - panel_x - 15
 
-    for idx, city_name in enumerate(CITIES_ORDER):
-        if idx >= 14:
-            break
-        row = idx // cols
-        col = idx % cols
+    # Guruhlarni shakllantiish (cities_data dan)
+    REGION_GROUPS = [
+        {"name": "Toshkent shahri", "cities": ["Toshkent"]},
+        {"name": "Qoraqalpog'iston R.,\nXorazm", "cities": ["Nukus", "Urganch"]},
+        {"name": "Buxoro", "cities": ["Buxoro"]},
+        {"name": "Navoiy", "cities": ["Navoiy"]},
+        {"name": "Toshkent, Samarqand,\nJizzax, Sirdaryo vil.", "cities": ["Toshkent", "Samarqand", "Jizzax", "Guliston"]},
+        {"name": "Qashqadaryo,\nSurxondaryo", "cities": ["Qarshi", "Termiz"]},
+        {"name": "Andijon, Namangan,\nFarg'ona", "cities": ["Andijon", "Namangan", "Farg'ona"]},
+        {"name": "Tog' oldi va tog'li\nhududlar", "cities": []},
+    ]
 
-        cx = panel_x + col * (card_w + gap)
-        cy = panel_y + row * (card_h + gap)
+    def get_group_data(group):
+        """Guruh uchun o'rtacha/max ma'lumotlarni olish."""
+        tmins, tmaxs, winds = [], [], []
+        weather_val = "ochiq"
+        for city in group["cities"]:
+            info = cities_data.get(city, {})
+            if not info:
+                continue
+            if info.get("temp_min") is not None:
+                tmins.append(info["temp_min"])
+            if info.get("temp_max") is not None:
+                tmaxs.append(info["temp_max"])
+            if info.get("wind") is not None:
+                winds.append(info["wind"])
+            if info.get("weather"):
+                weather_val = info["weather"]
+        return {
+            "temp_min_range": f"{min(tmins)}-{max(tmins)}\u00b0" if tmins else "\u2014",
+            "temp_max_range": f"{min(tmaxs)}-{max(tmaxs)}\u00b0" if tmaxs else "\u2014",
+            "wind_range": f"{min(winds)}-{max(winds)} m/s" if winds else "\u2014",
+            "weather": weather_val,
+            "has_data": bool(tmaxs),
+        }
 
-        info = cities_data.get(city_name, {})
-        tmax = info.get("temp_max")
-        tmin = info.get("temp_min")
-        wind = info.get("wind")
-        weather = info.get("weather", "ochiq")
+    # Sarlavha
+    draw.text((panel_x, panel_y), "VILOYATLAR BO\u2018YICHA PROGNOZ",
+              fill=HEADER_COLOR, font=get_font(12, bold=True))
 
-        # Kartochka fon
-        draw.rounded_rectangle([(cx, cy), (cx + card_w, cy + card_h)],
-                               radius=8, fill=CARD_BG, outline="#E0E5EC", width=1)
+    # Jadval sarlavhasi
+    row_y = panel_y + 25
+    col_region = panel_x + 5
+    col_night = panel_x + panel_w * 0.52
+    col_day = panel_x + panel_w * 0.70
+    col_wind = panel_x + panel_w * 0.88
 
-        # Shahar nomi
-        draw.text((cx + 8, cy + 6), city_name, fill=TEXT_DARK, font=font_city)
+    draw.text((col_region, row_y), "Hudud", fill=TEXT_GRAY, font=get_font(9, bold=True))
+    draw.text((col_night, row_y), "Kechasi", fill=ACCENT_BLUE, font=get_font(9, bold=True))
+    draw.text((col_day, row_y), "Kunduzi", fill=ACCENT_RED, font=get_font(9, bold=True))
+    draw.text((col_wind, row_y), "Shamol", fill=TEXT_GRAY, font=get_font(9, bold=True))
+
+    # Chiziq
+    row_y += 16
+    draw.line([(panel_x, row_y), (panel_x + panel_w, row_y)], fill="#CFE0EE", width=1)
+    row_y += 6
+
+    # Har bir guruh
+    row_h = 58
+    for idx, group in enumerate(REGION_GROUPS):
+        gy = row_y + idx * row_h
+
+        # Zebra fon
+        if idx % 2 == 0:
+            draw.rounded_rectangle(
+                [(panel_x, gy - 2), (panel_x + panel_w, gy + row_h - 6)],
+                radius=4, fill="#F6FBFF", outline=None)
+
+        # Guruh ma'lumotlari
+        gdata = get_group_data(group)
+
+        # Hudud nomi (ko'p qatorli bo'lishi mumkin)
+        name_lines = group["name"].split("\n")
+        for li, line in enumerate(name_lines):
+            draw.text((col_region, gy + li * 14), line,
+                      fill=TEXT_DARK, font=font_city)
 
         # Ob-havo belgisi
-        w_symbol = WEATHER_SYMBOLS.get(weather, "\u2600")
-        draw.text((cx + card_w - 25, cy + 6), w_symbol, fill=TEXT_GRAY, font=font_city)
+        w_symbol = WEATHER_SYMBOLS.get(gdata["weather"], "\u2600")
+        draw.text((col_region + panel_w * 0.42, gy), w_symbol,
+                  fill=TEXT_GRAY, font=get_font(16))
 
-        # Kunduz harorat (katta, qizil)
-        if tmax is not None:
-            draw.text((cx + 8, cy + 30), f"+{tmax}\u00b0", fill=ACCENT_RED, font=font_temp_big)
-        else:
-            draw.text((cx + 8, cy + 30), "\u2014", fill=TEXT_GRAY, font=font_temp_big)
+        # Kechasi harorat (ko'k)
+        draw.text((col_night, gy + 4), gdata["temp_min_range"],
+                  fill=ACCENT_BLUE, font=font_temp_sm)
 
-        # Tun harorat (kichik, ko'k)
-        if tmin is not None:
-            draw.text((cx + 75, cy + 35), f"+{tmin}\u00b0", fill=ACCENT_BLUE, font=font_temp_sm)
+        # Kunduzi harorat (qizil, katta)
+        draw.text((col_day, gy + 2), gdata["temp_max_range"],
+                  fill=ACCENT_RED, font=get_font(15, bold=True))
 
         # Shamol
-        if wind:
-            draw.text((cx + 8, cy + 65), f"\u2192 {wind} m/s", fill=TEXT_GRAY, font=font_wind)
+        draw.text((col_wind, gy + 5), gdata["wind_range"],
+                  fill=TEXT_GRAY, font=font_wind)
 
-        # Ob-havo nomi
-        weather_names = {
-            "ochiq":"ochiq","qisman_bulutli":"qis.bulutli","bulutli":"bulutli",
-            "yomgir":"yomg'ir","momaqaldiroq":"momaqald.","qor":"qor",
-            "tuman":"tuman","jala":"jala","dol":"do'l",
-            "chang_boroni":"chang","qor_boroni":"qor bo'r."
-        }
-        w_name = weather_names.get(weather, "")
-        draw.text((cx + 8, cy + 82), w_name, fill=TEXT_GRAY, font=font_legend)
+        # Ajratuvchi chiziq
+        if idx < len(REGION_GROUPS) - 1:
+            draw.line([(panel_x + 5, gy + row_h - 6),
+                       (panel_x + panel_w - 5, gy + row_h - 6)],
+                      fill="#E8EFF5", width=1)
 
     # === DIQQAT XABARI ===
-    alert_y = panel_y + 4 * (card_h + gap) + 10
+    alert_y = row_y + len(REGION_GROUPS) * row_h + 5
     comment = day_data.get("comment", "")
 
     if comment:

@@ -359,7 +359,7 @@ def render_pro_forecast(day_data, output_path, dpi=200):
         ax3.text(0.06, 0.20, f"\ud83d\udd25 Issiqlik xavfi: {', '.join(hot_cities)}",
                  transform=ax3.transAxes, fontsize=8, color="#B71C1C", zorder=10)
 
-    # === 4-BLOK: VILOYATLAR JADVALI ===
+    # === 4-BLOK: VILOYATLAR JADVALI (GURUHLAR BO'YICHA) ===
     ax4 = fig.add_axes([0.52, 0.05, 0.46, 0.35], zorder=10)
     ax4.axis("off")
     ax4.set_xlim(0, 1)
@@ -369,49 +369,72 @@ def render_pro_forecast(day_data, output_path, dpi=200):
              fontsize=11, fontweight="bold", color="#0B3D8F",
              transform=ax4.transAxes)
 
-    # Jadval
-    cols = [0.02, 0.40, 0.60, 0.80]
+    # Guruhlar
+    REGION_GROUPS = [
+        {"name": "Toshkent shahri", "cities": ["Toshkent"]},
+        {"name": "Qoraqalpog'iston R., Xorazm", "cities": ["Nukus", "Urganch"]},
+        {"name": "Buxoro", "cities": ["Buxoro"]},
+        {"name": "Navoiy", "cities": ["Navoiy"]},
+        {"name": "Toshkent, Samarqand, Jizzax, Sirdaryo", "cities": ["Toshkent", "Samarqand", "Jizzax", "Guliston"]},
+        {"name": "Qashqadaryo, Surxondaryo", "cities": ["Qarshi", "Termiz"]},
+        {"name": "Andijon, Namangan, Farg'ona", "cities": ["Andijon", "Namangan", "Farg'ona"]},
+    ]
+
+    # Jadval sarlavhasi
+    cols = [0.02, 0.48, 0.65, 0.82]
     ax4.text(cols[0], 0.88, "Hudud", transform=ax4.transAxes,
              fontsize=7, fontweight="bold", color="#0B3D8F")
     ax4.text(cols[1], 0.88, "Kechasi", transform=ax4.transAxes,
-             fontsize=7, fontweight="bold", color="#0B3D8F")
+             fontsize=7, fontweight="bold", color="#1565C0")
     ax4.text(cols[2], 0.88, "Kunduzi", transform=ax4.transAxes,
+             fontsize=7, fontweight="bold", color="#C22A00")
+    ax4.text(cols[3], 0.88, "Shamol", transform=ax4.transAxes,
              fontsize=7, fontweight="bold", color="#0B3D8F")
-    ax4.text(cols[3], 0.88, "Holat", transform=ax4.transAxes,
-             fontsize=7, fontweight="bold", color="#0B3D8F")
-
-    sorted_cities = sorted(cities_data.items(),
-                           key=lambda x: x[1].get("temp_max", 0) if x[1] else 0,
-                           reverse=True)
 
     y0 = 0.82
-    row_h = 0.058
-    for i, (city, info) in enumerate(sorted_cities[:13]):
-        if not info or info.get("temp_max") is None:
-            continue
+    row_h = 0.10
+    for i, group in enumerate(REGION_GROUPS):
         y = y0 - i * row_h
         if y < 0.05:
             break
 
         # Zebra fon
         if i % 2 == 0:
-            ax4.add_patch(Rectangle((0.01, y-0.02), 0.98, row_h,
+            ax4.add_patch(Rectangle((0.01, y-0.03), 0.98, row_h,
                                     transform=ax4.transAxes,
                                     facecolor="#F6FBFF", edgecolor="none", zorder=1))
 
-        tmax = info["temp_max"]
-        tmin = info.get("temp_min")
-        weather = info.get("weather", "ochiq")
+        # Guruh ma'lumotlarini yig'ish
+        tmins, tmaxs, winds = [], [], []
+        weather_val = "ochiq"
+        for city in group["cities"]:
+            info = cities_data.get(city, {})
+            if not info:
+                continue
+            if info.get("temp_min") is not None:
+                tmins.append(info["temp_min"])
+            if info.get("temp_max") is not None:
+                tmaxs.append(info["temp_max"])
+            if info.get("wind") is not None:
+                winds.append(info["wind"])
+            if info.get("weather"):
+                weather_val = info["weather"]
 
-        ax4.text(cols[0], y, city, transform=ax4.transAxes,
-                 fontsize=7, color="#1A2332", fontweight="bold", va="center", zorder=3)
-        ax4.text(cols[1], y, f"{tmin}\u00b0" if tmin else "\u2014",
-                 transform=ax4.transAxes, fontsize=7, color="#1565C0", va="center", zorder=3)
-        ax4.text(cols[2], y, f"{tmax}\u00b0", transform=ax4.transAxes,
-                 fontsize=7, color="#C22A00", fontweight="bold", va="center", zorder=3)
+        night_str = f"{min(tmins)}-{max(tmins)}\u00b0" if tmins else "\u2014"
+        day_str = f"{min(tmaxs)}-{max(tmaxs)}\u00b0" if tmaxs else "\u2014"
+        wind_str = f"{min(winds)}-{max(winds)} m/s" if winds else "\u2014"
+
+        ax4.text(cols[0], y, group["name"], transform=ax4.transAxes,
+                 fontsize=6.5, color="#1A2332", fontweight="bold", va="center", zorder=3)
+        ax4.text(cols[1], y, night_str, transform=ax4.transAxes,
+                 fontsize=7, color="#1565C0", va="center", zorder=3)
+        ax4.text(cols[2], y, day_str, transform=ax4.transAxes,
+                 fontsize=7.5, color="#C22A00", fontweight="bold", va="center", zorder=3)
+        ax4.text(cols[3], y, wind_str, transform=ax4.transAxes,
+                 fontsize=6.5, color="#455A64", va="center", zorder=3)
 
         # Ob-havo icon
-        put_icon(ax4, weather, cols[3]+0.06, y, s=0.20,
+        put_icon(ax4, weather_val, cols[3]+0.14, y, s=0.18,
                  transform=ax4.transAxes, z=90)
 
     # === FOOTER ===
