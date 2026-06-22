@@ -118,7 +118,17 @@ function buildTable() {
         tdMax.innerHTML = `<input type="number" id="tmax_${city}" min="-30" max="55" step="1" placeholder="max">`;
         tr.appendChild(tdMax);
 
-        // Weather type
+        // Shamol
+        const tdWind = document.createElement('td');
+        tdWind.innerHTML = `<input type="number" id="wind_${city}" min="0" max="50" step="1" placeholder="m/s">`;
+        tr.appendChild(tdWind);
+
+        // Yog'ingarchilik
+        const tdPrecip = document.createElement('td');
+        tdPrecip.innerHTML = `<input type="number" id="precip_${city}" min="0" max="100" step="0.1" placeholder="mm">`;
+        tr.appendChild(tdPrecip);
+
+        // Hodisa (ob-havo turi)
         const tdWeather = document.createElement('td');
         let selectHtml = `<select id="weather_${city}">`;
         WEATHER_OPTIONS.forEach(opt => {
@@ -139,12 +149,16 @@ function collectData() {
         const tmin = document.getElementById(`tmin_${city}`).value;
         const tmax = document.getElementById(`tmax_${city}`).value;
         const weather = document.getElementById(`weather_${city}`).value;
+        const wind = document.getElementById(`wind_${city}`).value;
+        const precip = document.getElementById(`precip_${city}`).value;
 
         if (tmax !== '') {
             data[city] = {
                 temp_min: tmin !== '' ? parseInt(tmin) : null,
                 temp_max: parseInt(tmax),
-                weather: weather
+                weather: weather,
+                wind: wind !== '' ? parseInt(wind) : null,
+                precip: precip !== '' ? parseFloat(precip) : 0
             };
         }
     });

@@ -160,15 +160,15 @@ def generate():
                 try:
                     render_forecast_card(day, output_path)
                     rendered = True
-                    # map va table rasmlarni qo'shish
+                    # map, table, wind, precip rasmlarni qo'shish
                     map_filename = f"prognoz_{forecast.id}_day{i+1}_map.png"
                     tbl_filename = f"prognoz_{forecast.id}_day{i+1}_table.png"
-                    map_path = OUTPUT_DIR / map_filename
-                    tbl_path = OUTPUT_DIR / tbl_filename
-                    if map_path.exists():
-                        images.append(f"/output/{map_filename}")
-                    if tbl_path.exists():
-                        images.append(f"/output/{tbl_filename}")
+                    wind_filename = f"prognoz_{forecast.id}_day{i+1}_wind.png"
+                    precip_filename = f"prognoz_{forecast.id}_day{i+1}_precip.png"
+                    for fn in [map_filename, tbl_filename, wind_filename, precip_filename]:
+                        fp = OUTPUT_DIR / fn
+                        if fp.exists():
+                            images.append(f"/output/{fn}")
                 except Exception as e:
                     print(f"[card_renderer] xatolik: {e}")
                     import traceback

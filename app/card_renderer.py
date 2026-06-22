@@ -224,9 +224,9 @@ def render_map_image(day_data, output_path):
                     temp_str = f"{tmax}\u00b0"
                 draw.text((px, py+8), temp_str, fill="#C62828", font=font_temp, anchor="mm")
 
-    # FOOTER (colorbar placeholder)
-    draw.rectangle([(0, H-50), (W, H)], fill="#F5F7FA")
-    draw.text((W//2, H-30), "Harorat skalasi: 15\u00b0...42\u00b0C+", fill="#546E7A", font=get_font(11), anchor="mm")
+    # FOOTER (logo)
+    draw.rectangle([(0, H-40), (W, H)], fill="#0B3D8F")
+    draw.text((W//2, H-22), "O'ZGIDROMET  |  hydromet.uz  |  t.me/uzgidromet", fill="#B0C4DE", font=get_font(10), anchor="mm")
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     img.save(output_path, "PNG")
@@ -249,7 +249,7 @@ def render_table_image(day_data, output_path):
         dt = datetime.now()
     date_label = f"{dt.day} {MONTHS_UZ[dt.month-1]} {dt.year}, {DAYS_UZ[dt.weekday()]}"
 
-    W, H = 1200, 1000
+    W, H = 1400, 1000
     img = Image.new("RGB", (W, H), "#FFFFFF")
     draw = ImageDraw.Draw(img)
 
@@ -280,14 +280,23 @@ def render_table_image(day_data, output_path):
 
     # Sarlavha
     y = 90
-    cols = [30, 550, 750, 950]
-    draw.text((cols[0], y), "HUDUD", fill="#0B3D8F", font=get_font(14, True))
-    draw.text((cols[1], y), "KECHASI", fill="#1565C0", font=get_font(14, True))
-    draw.text((cols[2], y), "KUNDUZI", fill="#C62828", font=get_font(14, True))
-    draw.text((cols[3], y), "SHAMOL", fill="#37474F", font=get_font(14, True))
+    cols = [30, 420, 560, 700, 840, 1000]
+    draw.text((cols[0], y), "HUDUD", fill="#0B3D8F", font=get_font(12, True))
+    draw.text((cols[1], y), "KECHASI", fill="#1565C0", font=get_font(12, True))
+    draw.text((cols[2], y), "KUNDUZI", fill="#C62828", font=get_font(12, True))
+    draw.text((cols[3], y), "SHAMOL", fill="#37474F", font=get_font(12, True))
+    draw.text((cols[4], y), "YOG'IN", fill="#0277BD", font=get_font(12, True))
+    draw.text((cols[5], y), "HODISA", fill="#4A148C", font=get_font(12, True))
     y += 30
     draw.line([(20, y), (W-20, y)], fill="#B0BEC5", width=2)
     y += 15
+
+    WEATHER_LABELS = {
+        "ochiq":"Ochiq","qisman_bulutli":"Qis. bulutli","bulutli":"Bulutli",
+        "yomgir":"Yomg'ir","jala":"Jala","momaqaldiroq":"Momaqaldiroq",
+        "qor":"Qor","dol":"Do'l","tuman":"Tuman",
+        "chang_boroni":"Chang bo'roni","qor_boroni":"Qor bo'roni"
+    }
 
     row_h = 75
     for i, group in enumerate(GROUPS):
@@ -298,22 +307,29 @@ def render_table_image(day_data, output_path):
             draw.rectangle([(20, gy-5), (W-20, gy+row_h-10)], fill="#F5F9FC")
 
         # Ma'lumot
-        tmins, tmaxs, winds = [], [], []
+        tmins, tmaxs, winds, precips = [], [], [], []
+        weather_val = "ochiq"
         for city in group["cities"]:
             info = cities_data.get(city, {})
             if not info: continue
             if info.get("temp_min") is not None: tmins.append(info["temp_min"])
             if info.get("temp_max") is not None: tmaxs.append(info["temp_max"])
             if info.get("wind") is not None: winds.append(info["wind"])
+            if info.get("precip") is not None: precips.append(info["precip"])
+            if info.get("weather"): weather_val = info["weather"]
 
         night = f"{min(tmins)}-{max(tmins)}\u00b0" if tmins else "\u2014"
         day_t = f"{min(tmaxs)}-{max(tmaxs)}\u00b0" if tmaxs else "\u2014"
         wind = f"{min(winds)}-{max(winds)} m/s" if winds else "\u2014"
+        precip_str = f"{max(precips)} mm" if precips and max(precips) > 0 else "\u2014"
+        hodisa = WEATHER_LABELS.get(weather_val, "Ochiq")
 
-        draw.text((cols[0], gy+10), group["name"], fill="#1A2332", font=get_font(13, True))
-        draw.text((cols[1], gy+8), night, fill="#1565C0", font=get_font(16, True))
-        draw.text((cols[2], gy+5), day_t, fill="#C62828", font=get_font(18, True))
-        draw.text((cols[3], gy+10), wind, fill="#37474F", font=get_font(13))
+        draw.text((cols[0], gy+10), group["name"], fill="#1A2332", font=get_font(11, True))
+        draw.text((cols[1], gy+8), night, fill="#1565C0", font=get_font(14, True))
+        draw.text((cols[2], gy+5), day_t, fill="#C62828", font=get_font(16, True))
+        draw.text((cols[3], gy+10), wind, fill="#37474F", font=get_font(11))
+        draw.text((cols[4], gy+10), precip_str, fill="#0277BD", font=get_font(11))
+        draw.text((cols[5], gy+10), hodisa, fill="#4A148C", font=get_font(11, True))
 
     # DIQQAT
     warn_y = y + len(GROUPS) * row_h + 10
@@ -335,7 +351,7 @@ def render_table_image(day_data, output_path):
     socials = [
         ("web.png", "uzgidromet.uz"),
         ("telegram.png", "t.me/uzgidromet"),
-        ("instagram.png", "instagram.com/uzgidromet.uz"),
+        ("instagram.gif", "instagram.com/uzgidromet.uz"),
         ("facebook.png", "facebook.com/uzgidromet.uz"),
         ("youtube.png", "youtube.com/@uzgidromet_"),
     ]
@@ -361,21 +377,231 @@ def render_table_image(day_data, output_path):
 
 
 # ===========================================================
+# 3-RASM: SHAMOL XARITASI
+# ===========================================================
+def render_wind_map(day_data, output_path):
+    """Shamol tezligi xaritasi."""
+    cities_data = day_data.get("cities", {})
+    date_str = day_data.get("date", "")
+    if date_str:
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError:
+            dt = datetime.now()
+    else:
+        dt = datetime.now()
+    date_label = f"{dt.day} {MONTHS_UZ[dt.month-1]} {dt.year}"
+
+    W, H = 1600, 1200
+    img = Image.new("RGB", (W, H), "#FFFFFF")
+    draw = ImageDraw.Draw(img)
+
+    # Header
+    draw.rectangle([(0, 0), (W, 70)], fill="#1B5E20")
+    if LOGO_PATH.exists():
+        try:
+            logo = Image.open(str(LOGO_PATH)).resize((55, 55))
+            img.paste(logo, (10, 8))
+        except Exception:
+            pass
+    draw.text((75, 12), "O'ZGIDROMET", fill="#FFFFFF", font=get_font(20, True))
+    draw.text((W//2, 15), "SHAMOL TEZLIGI XARITASI", fill="#FFFFFF", font=get_font(18, True), anchor="mt")
+    draw.text((W//2, 45), date_label, fill="#B0C4DE", font=get_font(12), anchor="mt")
+
+    # Xarita
+    geojson_path = download_geojson()
+    map_top = 80
+    map_h = H - 130
+    map_w = W - 40
+
+    if geojson_path and geojson_path.exists():
+        with open(geojson_path, "r", encoding="utf-8") as f:
+            geojson = json.load(f)
+        all_lons, all_lats = [], []
+        for feat in geojson.get("features", []):
+            rings = []
+            if feat["geometry"]["type"] == "Polygon":
+                rings = feat["geometry"]["coordinates"]
+            elif feat["geometry"]["type"] == "MultiPolygon":
+                for mp in feat["geometry"]["coordinates"]:
+                    rings.extend(mp)
+            for ring in rings:
+                for lon, lat in ring:
+                    all_lons.append(lon); all_lats.append(lat)
+        bounds = (min(all_lons), min(all_lats), max(all_lons), max(all_lats))
+
+        def to_px(lon, lat):
+            return geo_to_pixel(lon, lat, bounds, map_w, map_h, padding=30)
+
+        centroids = {}
+        for feat in geojson.get("features", []):
+            props = feat.get("properties", {})
+            region_name = props.get("name") or props.get("NAME_1") or ""
+            geom = feat["geometry"]
+            city = get_city_for_region(region_name)
+            info = cities_data.get(city, {}) if city else {}
+            wind = info.get("wind") if info else None
+
+            # Shamol ranglar
+            if wind is None: fill = "#E8F5E9"
+            elif wind >= 15: fill = "#FFCDD2"
+            elif wind >= 10: fill = "#FFF9C4"
+            elif wind >= 5: fill = "#C8E6C9"
+            else: fill = "#E8F5E9"
+
+            rings = []
+            if geom["type"] == "Polygon": rings = geom["coordinates"]
+            elif geom["type"] == "MultiPolygon":
+                for mp in geom["coordinates"]: rings.extend(mp)
+            largest_ring = max(rings, key=len) if rings else None
+            for ring in rings:
+                pixels = [(20+to_px(lon,lat)[0], map_top+to_px(lon,lat)[1]) for lon,lat in ring]
+                if len(pixels) >= 3:
+                    draw.polygon(pixels, fill=fill, outline="#2C3E50")
+            if city and largest_ring:
+                cx = sum(p[0] for p in largest_ring)/len(largest_ring)
+                cy = sum(p[1] for p in largest_ring)/len(largest_ring)
+                px, py = to_px(cx, cy)
+                centroids[city] = (20+px, map_top+py)
+
+        for city, (px, py) in centroids.items():
+            info = cities_data.get(city, {})
+            wind = info.get("wind") if info else None
+            if wind:
+                draw.ellipse([(px-25, py-15), (px+25, py+15)], fill="#FFFFFF", outline="#4CAF50")
+                draw.text((px, py), f"{wind} m/s", fill="#1B5E20", font=get_font(11, True), anchor="mm")
+
+    draw.rectangle([(0, H-40), (W, H)], fill="#1B5E20")
+    draw.text((W//2, H-22), "O'ZGIDROMET  |  hydromet.uz", fill="#B0C4DE", font=get_font(10), anchor="mm")
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    img.save(output_path, "PNG")
+    return output_path
+
+
+# ===========================================================
+# 4-RASM: YOG'INGARCHILIK XARITASI
+# ===========================================================
+def render_precip_map(day_data, output_path):
+    """Yog'ingarchilik xaritasi."""
+    cities_data = day_data.get("cities", {})
+    date_str = day_data.get("date", "")
+    if date_str:
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError:
+            dt = datetime.now()
+    else:
+        dt = datetime.now()
+    date_label = f"{dt.day} {MONTHS_UZ[dt.month-1]} {dt.year}"
+
+    W, H = 1600, 1200
+    img = Image.new("RGB", (W, H), "#FFFFFF")
+    draw = ImageDraw.Draw(img)
+
+    draw.rectangle([(0, 0), (W, 70)], fill="#01579B")
+    if LOGO_PATH.exists():
+        try:
+            logo = Image.open(str(LOGO_PATH)).resize((55, 55))
+            img.paste(logo, (10, 8))
+        except Exception:
+            pass
+    draw.text((75, 12), "O'ZGIDROMET", fill="#FFFFFF", font=get_font(20, True))
+    draw.text((W//2, 15), "YOG'INGARCHILIK XARITASI", fill="#FFFFFF", font=get_font(18, True), anchor="mt")
+    draw.text((W//2, 45), date_label, fill="#B0C4DE", font=get_font(12), anchor="mt")
+
+    geojson_path = download_geojson()
+    map_top = 80
+    map_h = H - 130
+    map_w = W - 40
+
+    if geojson_path and geojson_path.exists():
+        with open(geojson_path, "r", encoding="utf-8") as f:
+            geojson = json.load(f)
+        all_lons, all_lats = [], []
+        for feat in geojson.get("features", []):
+            rings = []
+            if feat["geometry"]["type"] == "Polygon": rings = feat["geometry"]["coordinates"]
+            elif feat["geometry"]["type"] == "MultiPolygon":
+                for mp in feat["geometry"]["coordinates"]: rings.extend(mp)
+            for ring in rings:
+                for lon, lat in ring:
+                    all_lons.append(lon); all_lats.append(lat)
+        bounds = (min(all_lons), min(all_lats), max(all_lons), max(all_lats))
+
+        def to_px(lon, lat):
+            return geo_to_pixel(lon, lat, bounds, map_w, map_h, padding=30)
+
+        centroids = {}
+        for feat in geojson.get("features", []):
+            props = feat.get("properties", {})
+            region_name = props.get("name") or props.get("NAME_1") or ""
+            geom = feat["geometry"]
+            city = get_city_for_region(region_name)
+            info = cities_data.get(city, {}) if city else {}
+            precip = info.get("precip", 0) if info else 0
+
+            if precip >= 10: fill = "#1565C0"
+            elif precip >= 5: fill = "#42A5F5"
+            elif precip > 0: fill = "#BBDEFB"
+            else: fill = "#E3F2FD"
+
+            rings = []
+            if geom["type"] == "Polygon": rings = geom["coordinates"]
+            elif geom["type"] == "MultiPolygon":
+                for mp in geom["coordinates"]: rings.extend(mp)
+            largest_ring = max(rings, key=len) if rings else None
+            for ring in rings:
+                pixels = [(20+to_px(lon,lat)[0], map_top+to_px(lon,lat)[1]) for lon,lat in ring]
+                if len(pixels) >= 3:
+                    draw.polygon(pixels, fill=fill, outline="#2C3E50")
+            if city and largest_ring:
+                cx = sum(p[0] for p in largest_ring)/len(largest_ring)
+                cy = sum(p[1] for p in largest_ring)/len(largest_ring)
+                px, py = to_px(cx, cy)
+                centroids[city] = (20+px, map_top+py)
+
+        for city, (px, py) in centroids.items():
+            info = cities_data.get(city, {})
+            precip = info.get("precip", 0) if info else 0
+            if precip and precip > 0:
+                draw.ellipse([(px-22, py-12), (px+22, py+12)], fill="#FFFFFF", outline="#1565C0")
+                draw.text((px, py), f"{precip} mm", fill="#01579B", font=get_font(11, True), anchor="mm")
+
+    draw.rectangle([(0, H-40), (W, H)], fill="#01579B")
+    draw.text((W//2, H-22), "O'ZGIDROMET  |  hydromet.uz", fill="#B0C4DE", font=get_font(10), anchor="mm")
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    img.save(output_path, "PNG")
+    return output_path
+
+
+# ===========================================================
 # ASOSIY (server.py uchun)
 # ===========================================================
 def render_forecast_card(day_data, output_path, dpi=150):
-    """2 ta rasm: xarita + jadval."""
+    """4 ta rasm: harorat xaritasi + jadval + shamol + yog'ingarchilik."""
     base = Path(output_path)
     stem = base.stem
     parent = base.parent
     parent.mkdir(parents=True, exist_ok=True)
 
+    # 1) Harorat xaritasi
     map_path = str(parent / f"{stem}_map.png")
     render_map_image(day_data, map_path)
 
+    # 2) Jadval
     tbl_path = str(parent / f"{stem}_table.png")
     render_table_image(day_data, tbl_path)
 
-    # Asosiy fayl = xarita
+    # 3) Shamol xaritasi
+    wind_path = str(parent / f"{stem}_wind.png")
+    render_wind_map(day_data, wind_path)
+
+    # 4) Yog'ingarchilik xaritasi
+    precip_path = str(parent / f"{stem}_precip.png")
+    render_precip_map(day_data, precip_path)
+
+    # Asosiy fayl = harorat xaritasi
     render_map_image(day_data, output_path)
     return output_path
