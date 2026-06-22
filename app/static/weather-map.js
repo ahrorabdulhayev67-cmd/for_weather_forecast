@@ -1,21 +1,24 @@
 /**
- * Ob-havo prognozi xarita generatori
- * SVG asosida viloyat ranglanishi + Meteocons ikonkalar + termometr legend
- * PNG sifatida yuklab olish imkoniyati
+ * Ob-havo prognozi xarita generatori v3.0
+ * Reference: Pragnoz uchun.txt dizayni asosida
+ * - Haqiqiy shapefile chegaralari
+ * - Ko'k->yashil->sariq->qizil gradient (2°C oraliq)
+ * - Meteocons SVG ikonkalar
+ * - Viloyat nomlari + harorat + shamol labellari
+ * - Professional O'zgidromet header/footer
  */
 
-// ===== HARORAT RANGLARI =====
+// ===== HARORAT RANGLARI (Reference: LinearSegmentedColormap) =====
+// Ko'k → moviy → yashil → sariq → to'q sariq → qizil gradient
 function tempToGradientColor(temp) {
     const stops = [
-        { t: -10, r: 26, g: 35, b: 126 },
-        { t: 0, r: 21, g: 101, b: 192 },
-        { t: 10, r: 0, g: 131, b: 143 },
-        { t: 18, r: 46, g: 125, b: 50 },
-        { t: 25, r: 85, g: 139, b: 47 },
-        { t: 30, r: 249, g: 168, b: 37 },
-        { t: 35, r: 239, g: 108, b: 0 },
-        { t: 40, r: 198, g: 40, b: 40 },
-        { t: 48, r: 136, g: 14, b: 79 }
+        { t: 10, r: 21, g: 101, b: 192 },   // #1565C0 ko'k
+        { t: 16, r: 41, g: 182, b: 246 },   // #29B6F6 moviy
+        { t: 22, r: 102, g: 187, b: 106 },  // #66BB6A yashil
+        { t: 28, r: 255, g: 241, b: 118 },  // #FFF176 sariq
+        { t: 34, r: 255, g: 152, b: 0 },    // #FF9800 to'q sariq
+        { t: 40, r: 229, g: 57, b: 53 },    // #E53935 qizil
+        { t: 46, r: 183, g: 28, b: 28 }     // #B71C1C to'q qizil
     ];
 
     if (temp <= stops[0].t) return `rgb(${stops[0].r},${stops[0].g},${stops[0].b})`;
@@ -33,11 +36,10 @@ function tempToGradientColor(temp) {
             return `rgb(${r},${g},${b})`;
         }
     }
-    return '#558b2f';
+    return '#66BB6A';
 }
 
 // ===== OB-HAVO IKONKA MAPPING =====
-// Maps weather type to SVG icon file name
 const WEATHER_ICON_FILES = {
     "ochiq": "sun.svg",
     "qisman_bulutli": "partly-cloudy-day.svg",
@@ -52,17 +54,14 @@ const WEATHER_ICON_FILES = {
     "qor_boroni": "overcast-snow.svg"
 };
 
-// SVG icon content cache (loaded inline for PNG export compatibility)
 let iconCache = {};
 
-// Load all icons as inline SVG data URIs for embedding
 async function loadIconsAsDataURIs() {
     const promises = Object.entries(WEATHER_ICON_FILES).map(async ([key, filename]) => {
         try {
             const response = await fetch(`/static/icons/${filename}`);
             if (response.ok) {
                 const svgText = await response.text();
-                // Convert to data URI for use in <image> tags
                 const encoded = btoa(unescape(encodeURIComponent(svgText)));
                 iconCache[key] = `data:image/svg+xml;base64,${encoded}`;
             }
@@ -71,133 +70,159 @@ async function loadIconsAsDataURIs() {
         }
     });
     await Promise.all(promises);
-    console.log(`Loaded ${Object.keys(iconCache).length} weather icons`);
 }
 
-// ===== TERMOMETR LEGEND =====
-function renderThermometerLegend(x, y, height) {
-    const width = 28;
-    const temps = [48, 44, 40, 36, 32, 28, 24, 20, 16, 12, 8, 4, 0, -4, -8];
-    const segH = height / temps.length;
-    
+// ===== VILOYAT NOMI SILJITISHLARI (reference koddan) =====
+const LABEL_OFFSETS = {
+    "Nukus": { dx: 0, dy: -15 },
+    "Urganch": { dx: -15, dy: 10 },
+    "Buxoro": { dx: 0, dy: -5 },
+    "Navoiy": { dx: 0, dy: -10 },
+    "Samarqand": { dx: 0, dy: 5 },
+    "Jizzax": { dx: 0, dy: -5 },
+    "Guliston": { dx: 20, dy: -5 },
+    "Toshkent": { dx: -20, dy: -20 },
+    "Namangan": { dx: 15, dy: -18 },
+    "Andijon": { dx: 25, dy: 0 },
+    "Farg'ona": { dx: 25, dy: 10 },
+    "Qarshi": { dx: 0, dy: -5 },
+    "Termiz": { dx: 0, dy: 5 },
+};
+
+// ===== HORIZONTAL COLORBAR =====
+function renderColorbar(x, y, width, height) {
+    const temps = [10, 14, 18, 22, 26, 30, 34, 38, 42, 46];
+    const segW = width / (temps.length - 1);
     let svg = '';
-    
-    // Background panel
-    svg += `<rect x="${x - 8}" y="${y - 30}" width="${width + 50}" height="${height + 55}" rx="6" fill="rgba(255,255,255,0.85)" stroke="#c8d8e8" stroke-width="1"/>`;
-    
-    // Title
-    svg += `<text x="${x + width / 2 + 12}" y="${y - 12}" text-anchor="middle" font-size="11" font-weight="bold" fill="#1a3a5c" font-family="Arial, sans-serif">°C</text>`;
-    
-    // Gradient segments
-    temps.forEach((temp, i) => {
-        const segY = y + i * segH;
-        const color = tempToGradientColor(temp);
-        svg += `<rect x="${x}" y="${segY}" width="${width}" height="${segH + 0.5}" fill="${color}"/>`;
-        // Temperature label
-        svg += `<text x="${x + width + 5}" y="${segY + segH / 2 + 4}" font-size="9" fill="#37474f" font-family="Arial, sans-serif">${temp}°</text>`;
-    });
-    
-    // Border around color bar
-    svg += `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="3" ry="3" fill="none" stroke="#455a64" stroke-width="1.5"/>`;
-    
-    // Thermometer bulb at bottom
-    svg += `<circle cx="${x + width / 2}" cy="${y + height + 10}" r="8" fill="#c62828" stroke="#455a64" stroke-width="1.5"/>`;
-    svg += `<rect x="${x + width / 2 - 3}" y="${y + height - 2}" width="6" height="12" fill="#c62828"/>`;
-    
+
+    // Label
+    svg += `<text x="${x + width / 2}" y="${y - 8}" text-anchor="middle" font-size="10" font-weight="bold" fill="#0B3D91" font-family="Arial, sans-serif">Harorat, °C</text>`;
+
+    // Color segments
+    for (let i = 0; i < temps.length - 1; i++) {
+        const color = tempToGradientColor((temps[i] + temps[i + 1]) / 2);
+        svg += `<rect x="${x + i * segW}" y="${y}" width="${segW + 0.5}" height="${height}" fill="${color}"/>`;
+    }
+
+    // Border
+    svg += `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="none" stroke="#455a64" stroke-width="1"/>`;
+
+    // Tick labels
+    for (let i = 0; i < temps.length; i++) {
+        const tx = x + i * segW;
+        svg += `<line x1="${tx}" y1="${y + height}" x2="${tx}" y2="${y + height + 4}" stroke="#455a64" stroke-width="0.8"/>`;
+        svg += `<text x="${tx}" y="${y + height + 14}" text-anchor="middle" font-size="8" fill="#37474f" font-family="Arial, sans-serif">${temps[i]}°</text>`;
+    }
+
     return svg;
 }
 
 // ===== ASOSIY XARITA RENDERI =====
 function renderWeatherMap(weatherData, dateStr, title) {
     const svgWidth = 1200;
-    const svgHeight = 750;
-    const legendX = svgWidth - 90;
-    const legendY = 130;
-    const iconSize = 32;
-    
+    const svgHeight = 800;
+    const iconSize = 30;
+
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">`;
-    
-    // Background
-    svg += `<rect width="${svgWidth}" height="${svgHeight}" fill="#f0f4f8"/>`;
-    
-    // Header background with gradient
-    svg += `<defs><linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#0d2137"/><stop offset="100%" style="stop-color:#1a3a5c"/></linearGradient></defs>`;
-    svg += `<rect x="0" y="0" width="${svgWidth}" height="72" fill="url(#headerGrad)"/>`;
-    
-    // Logo area
-    svg += `<text x="35" y="30" font-size="16" font-weight="bold" fill="white" font-family="Arial, sans-serif">O'ZBEKISTON RESPUBLIKASI</text>`;
-    svg += `<text x="35" y="52" font-size="12" fill="rgba(255,255,255,0.85)" font-family="Arial, sans-serif">Gidrometeorologiya xizmati agentligi</text>`;
-    
-    // Center title
-    svg += `<text x="${svgWidth / 2}" y="30" text-anchor="middle" font-size="20" font-weight="bold" fill="#FFD600" font-family="Arial, sans-serif">OB-HAVO PROGNOZI</text>`;
-    svg += `<text x="${svgWidth / 2}" y="52" text-anchor="middle" font-size="13" fill="rgba(255,255,255,0.9)" font-family="Arial, sans-serif">${dateStr || ''}</text>`;
-    
-    // Right side
-    svg += `<text x="${svgWidth - 35}" y="42" text-anchor="end" font-size="11" fill="rgba(255,255,255,0.7)" font-family="Arial, sans-serif">hydromet.uz</text>`;
-    
-    // Map area background
-    svg += `<rect x="20" y="82" width="${svgWidth - 135}" height="${svgHeight - 118}" rx="8" fill="#e8f4f8" stroke="#b8d4e8" stroke-width="1"/>`;
-    
-    // === VILOYATLAR ===
+
+    // === DEFS ===
+    svg += `<defs>`;
+    svg += `<linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#0B3D91"/><stop offset="100%" stop-color="#1565C0"/></linearGradient>`;
+    svg += `<linearGradient id="mapBg" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#EAF4FF"/><stop offset="100%" stop-color="#D4E8F8"/></linearGradient>`;
+    svg += `<filter id="shadow" x="-2%" y="-2%" width="104%" height="104%"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.1"/></filter>`;
+    svg += `</defs>`;
+
+    // === BACKGROUND ===
+    svg += `<rect width="${svgWidth}" height="${svgHeight}" fill="#EAF4FF"/>`;
+
+    // === MAIN PANEL (reference: rounded box with border) ===
+    svg += `<rect x="15" y="15" width="${svgWidth - 30}" height="${svgHeight - 30}" rx="12" fill="#F7FBFF" stroke="#0B4EA2" stroke-width="2.5"/>`;
+
+    // === HEADER ===
+    svg += `<rect x="15" y="15" width="${svgWidth - 30}" height="65" rx="12" fill="url(#headerGrad)"/>`;
+    svg += `<rect x="15" y="55" width="${svgWidth - 30}" height="25" fill="url(#headerGrad)"/>`;
+
+    // Logo text
+    svg += `<text x="40" y="42" font-size="18" font-weight="bold" fill="white" font-family="Arial, sans-serif">O'ZGIDROMET</text>`;
+    svg += `<text x="40" y="62" font-size="9" fill="rgba(255,255,255,0.8)" font-family="Arial, sans-serif">O'ZBEKISTON GIDROMETEOROLOGIYA XIZMATI</text>`;
+
+    // Title center
+    svg += `<text x="${svgWidth / 2}" y="42" text-anchor="middle" font-size="22" font-weight="bold" fill="#FFD600" font-family="Arial, sans-serif">HARORAT XARITASI</text>`;
+    svg += `<text x="${svgWidth / 2}" y="62" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.9)" font-family="Arial, sans-serif">${dateStr || ''}</text>`;
+
+    // Date badge right
+    svg += `<text x="${svgWidth - 40}" y="48" text-anchor="end" font-size="10" fill="rgba(255,255,255,0.8)" font-family="Arial, sans-serif">hydromet.uz</text>`;
+
+    // === MAP AREA ===
+    svg += `<rect x="30" y="90" width="${svgWidth - 60}" height="${svgHeight - 160}" rx="8" fill="url(#mapBg)"/>`;
+
+    // === VILOYATLAR (haqiqiy shapefile) ===
     for (const [regionId, regionData] of Object.entries(REGIONS)) {
         const city = Object.entries(CITIES).find(([_, c]) => c.region === regionId);
-        let fillColor = '#dce8d4';
-        
+        let fillColor = '#E8F5E9';
+
         if (city && weatherData[city[0]]) {
             const tempMax = weatherData[city[0]].temp_max;
             const tempMin = weatherData[city[0]].temp_min;
-            const avgTemp = tempMin != null ? (tempMin + tempMax) / 2 : tempMax;
-            fillColor = tempToGradientColor(avgTemp);
+            // Use max temp for coloring (reference uses day temp)
+            fillColor = tempToGradientColor(tempMax);
         }
-        
-        // Each region can have multiple rings (parts)
+
         let pathD = '';
         for (const ring of regionData.rings) {
             pathD += ringToPath(ring) + ' ';
         }
-        svg += `<path d="${pathD.trim()}" fill="${fillColor}" fill-opacity="0.75" stroke="#2c3e50" stroke-width="1.2" stroke-linejoin="round"/>`;
+        // Thicker white border first, then colored border (like reference)
+        svg += `<path d="${pathD.trim()}" fill="${fillColor}" fill-opacity="0.88" stroke="white" stroke-width="2.5" stroke-linejoin="round"/>`;
+        svg += `<path d="${pathD.trim()}" fill="none" stroke="#0B4EA2" stroke-width="0.4" stroke-linejoin="round" stroke-opacity="0.6"/>`;
     }
-    
+
     // === SHAHAR BELGILARI + HARORAT + IKONKALAR ===
     for (const [cityName, cityData] of Object.entries(CITIES)) {
-        const [cx, cy] = geoToSvg(cityData.lon, cityData.lat);
+        let [cx, cy] = geoToSvg(cityData.lon, cityData.lat);
         const weather = weatherData[cityName];
-        
         if (!weather) continue;
-        
+
+        // Apply offset
+        const offset = LABEL_OFFSETS[cityName] || { dx: 0, dy: 0 };
+        const lx = cx + offset.dx;
+        const ly = cy + offset.dy;
+
         const weatherType = weather.weather || 'ochiq';
-        
-        // Ob-havo ikonkasi (embedded SVG image)
-        if (iconCache[weatherType]) {
-            svg += `<image x="${cx - iconSize / 2}" y="${cy - iconSize - 12}" width="${iconSize}" height="${iconSize}" href="${iconCache[weatherType]}"/>`;
-        }
-        
-        // Shahar nuqtasi
-        svg += `<circle cx="${cx}" cy="${cy}" r="4" fill="white" stroke="#1a3a5c" stroke-width="2"/>`;
-        
-        // Harorat label
         const tmin = weather.temp_min;
         const tmax = weather.temp_max;
-        const tempStr = (tmin !== undefined && tmin !== null) 
-            ? `${tmin}°..${tmax}°` 
-            : `${tmax}°`;
-        
-        // Background for temperature
-        const textWidth = tempStr.length * 7 + 10;
-        svg += `<rect x="${cx - textWidth / 2}" y="${cy + 6}" width="${textWidth}" height="17" rx="8" fill="rgba(255,255,255,0.92)" stroke="rgba(0,0,0,0.15)" stroke-width="0.7"/>`;
-        svg += `<text x="${cx}" y="${cy + 19}" text-anchor="middle" font-size="11" font-weight="bold" fill="#1a237e" font-family="Arial, sans-serif">${tempStr}</text>`;
-        
-        // Shahar nomi
-        svg += `<text x="${cx}" y="${cy + 35}" text-anchor="middle" font-size="9.5" fill="#263238" font-weight="600" font-family="Arial, sans-serif">${cityName}</text>`;
+
+        // --- Viloyat nomi (yuqorida, bold, kichik) ---
+        const regionName = REGIONS[cityData.region] ? REGIONS[cityData.region].name : cityName;
+        const shortName = regionName.length > 14 ? regionName.substring(0, 12) + '.' : regionName;
+        svg += `<text x="${lx}" y="${ly - 38}" text-anchor="middle" font-size="8.5" font-weight="bold" fill="#0B3D91" font-family="Arial, sans-serif">${shortName}</text>`;
+
+        // --- Ob-havo ikonkasi ---
+        if (iconCache[weatherType]) {
+            svg += `<image x="${lx - iconSize / 2}" y="${ly - 34}" width="${iconSize}" height="${iconSize}" href="${iconCache[weatherType]}"/>`;
+        }
+
+        // --- Shahar nuqtasi ---
+        svg += `<circle cx="${cx}" cy="${cy}" r="3.5" fill="white" stroke="#0B4EA2" stroke-width="1.5"/>`;
+
+        // --- Kunduzi harorat (qizil, bold) ---
+        const dayStr = (tmin !== undefined && tmin !== null)
+            ? `${tmin}...${tmax}°C`
+            : `${tmax}°C`;
+        svg += `<text x="${lx}" y="${ly + 12}" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#E53935" font-family="Arial, sans-serif">${dayStr}</text>`;
+
+        // --- Kechasi harorat (ko'k, kichikroq) ---
+        if (tmin !== undefined && tmin !== null) {
+            svg += `<text x="${lx}" y="${ly + 25}" text-anchor="middle" font-size="8.5" fill="#1565C0" font-family="Arial, sans-serif">kechasi: ${tmin}°C</text>`;
+        }
     }
-    
-    // === TERMOMETR LEGEND ===
-    svg += renderThermometerLegend(legendX, legendY, 440);
-    
+
+    // === COLORBAR (pastda, horizontal) ===
+    svg += renderColorbar(200, svgHeight - 55, 500, 14);
+
     // === FOOTER ===
-    svg += `<rect x="0" y="${svgHeight - 30}" width="${svgWidth}" height="30" fill="url(#headerGrad)"/>`;
-    svg += `<text x="${svgWidth / 2}" y="${svgHeight - 11}" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.85)" font-family="Arial, sans-serif">hydromet.uz  |  t.me/uzhydromet  |  O'zbekiston Gidrometeorologiya xizmati agentligi</text>`;
-    
+    svg += `<text x="${svgWidth / 2}" y="${svgHeight - 22}" text-anchor="middle" font-size="9" fill="#546E7A" font-family="Arial, sans-serif">O'zbekiston Gidrometeorologiya xizmati agentligi  |  hydromet.uz  |  t.me/uzhydromet</text>`;
+
     svg += '</svg>';
     return svg;
 }
@@ -207,17 +232,17 @@ function downloadMapAsPng(svgElement, filename) {
     const svgData = new XMLSerializer().serializeToString(svgElement);
     const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
-    
+
     const img = new Image();
     img.onload = function() {
         const canvas = document.createElement('canvas');
-        const scale = 2; // 2x for high quality
+        const scale = 2;
         canvas.width = 1200 * scale;
-        canvas.height = 750 * scale;
+        canvas.height = 800 * scale;
         const ctx = canvas.getContext('2d');
         ctx.scale(scale, scale);
         ctx.drawImage(img, 0, 0);
-        
+
         canvas.toBlob(function(blob) {
             const link = document.createElement('a');
             link.download = filename || 'ob-havo-prognozi.png';
@@ -225,7 +250,6 @@ function downloadMapAsPng(svgElement, filename) {
             link.click();
             URL.revokeObjectURL(link.href);
         }, 'image/png');
-        
         URL.revokeObjectURL(url);
     };
     img.src = url;
