@@ -1,20 +1,16 @@
 """
 O'zgidromet — 2 ta alohida rasm generatori.
-1-RASM: Xarita (to'liq ekran, sifatli)
-2-RASM: Jadval (guruhlar + footer)
+FAQAT PIL (Pillow) — matplotlib KERAK EMAS.
+GeoJSON koordinatalari -> PIL polygon.
+
+1-RASM: Xarita (to'liq, sifatli)
+2-RASM: Jadval (guruhlar + ijtimoiy tarmoqlar)
 """
 import json
 import urllib.request
 from pathlib import Path
 from datetime import datetime
-
-import numpy as np
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.patheffects as pe
-from matplotlib.patches import FancyBboxPatch, Polygon, Rectangle
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 # === CONFIG ===
 GEOJSON_URL = "https://raw.githubusercontent.com/akbartus/GeoJSON-Uzbekistan/main/Uzbekistan_regions.json"
@@ -30,8 +26,7 @@ REGION_CITY_MAP = {
     "Toshkent":"Toshkent","Tashkent":"Toshkent",
     "Samarqand":"Samarqand","Samarkand":"Samarqand",
     "Buxoro":"Buxoro","Bukhara":"Buxoro",
-    "Namangan":"Namangan",
-    "Andijon":"Andijon","Andijan":"Andijon",
+    "Namangan":"Namangan","Andijon":"Andijon","Andijan":"Andijon",
     "Farg'ona":"Farg'ona","Fergana":"Farg'ona","Fargona":"Farg'ona",
     "Qashqadaryo":"Qarshi","Kashkadarya":"Qarshi",
     "Qoraqalpog'iston":"Nukus","Karakalpakstan":"Nukus",
@@ -40,14 +35,6 @@ REGION_CITY_MAP = {
     "Jizzax":"Jizzax","Jizzakh":"Jizzax",
     "Xorazm":"Urganch","Khorezm":"Urganch",
     "Sirdaryo":"Guliston","Syrdarya":"Guliston",
-}
-
-SHORT_NAMES = {
-    "Toshkent":"Toshkent","Samarqand":"Samarqand","Buxoro":"Buxoro",
-    "Namangan":"Namangan","Andijon":"Andijon","Farg'ona":"Farg'ona",
-    "Qarshi":"Qarshi","Nukus":"Nukus","Navoiy":"Navoiy",
-    "Termiz":"Termiz","Jizzax":"Jizzax","Urganch":"Urganch",
-    "Guliston":"Guliston",
 }
 
 
@@ -67,6 +54,21 @@ def temp_to_color(t):
     return "#B39DDB"
 
 
+def get_font(size, bold=False):
+    paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    ]
+    for p in paths:
+        if Path(p).exists():
+            return ImageFont.truetype(p, size)
+    try:
+        return ImageFont.truetype("DejaVuSans.ttf", size)
+    except Exception:
+        return ImageFont.load_default()
+
+
 def download_geojson():
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     if GEOJSON_CACHE.exists():
@@ -78,24 +80,25 @@ def download_geojson():
         return None
 
 
-def get_city_for_region(region_name):
+def get_city_for_region(name):
     for key, city in REGION_CITY_MAP.items():
-        if key.lower() in region_name.lower() or region_name.lower() in key.lower():
+        if key.lower() in name.lower() or name.lower() in key.lower():
             return city
     return None
 
 
-def polygon_centroid(coords):
-    xs = [p[0] for p in coords]
-    ys = [p[1] for p in coords]
-    return (sum(xs)/len(xs), sum(ys)/len(ys))
+def geo_to_pixel(lon, lat, bounds, img_w, img_h, padding=20):
+    """GeoJSON koordinatani pikselga aylantirish."""
+    min_lon, min_lat, max_lon, max_lat = bounds
+    x = padding + (lon - min_lon) / (max_lon - min_lon) * (img_w - 2*padding)
+    y = padding + (max_lat - lat) / (max_lat - min_lat) * (img_h - 2*padding)
+    return (x, y)
 
 
 # ===========================================================
 # 1-RASM: XARITA
 # ===========================================================
-def render_map_image(day_data, output_path, dpi=180):
-    """To'liq ekran xarita — sifatli, katta."""
+def render_map_image(day_data, output_path):
     cities_data = day_data.get("cities", {})
     date_str = day_data.get("date", "")
     if date_str:
@@ -107,121 +110,114 @@ def render_map_image(day_data, output_path, dpi=180):
         dt = datetime.now()
     date_label = f"{dt.day} {MONTHS_UZ[dt.month-1]} {dt.year}, {DAYS_UZ[dt.weekday()]}"
 
-    geojson_path = download_geojson()
-
-    fig = plt.figure(figsize=(12, 9), facecolor="white", dpi=dpi)
+    W, H = 1600, 1200
+    img = Image.new("RGB", (W, H), "#FFFFFF")
+    draw = ImageDraw.Draw(img)
 
     # HEADER
-    fig.patches.append(Rectangle((0, 0.92), 1, 0.08,
-        transform=fig.transFigure, facecolor="#0B3D8F", edgecolor="none", zorder=0))
-
+    draw.rectangle([(0, 0), (W, 70)], fill="#0B3D8F")
     if LOGO_PATH.exists():
         try:
-            logo_ax = fig.add_axes([0.01, 0.925, 0.05, 0.065], zorder=30)
-            logo_ax.imshow(Image.open(str(LOGO_PATH)))
-            logo_ax.axis("off")
+            logo = Image.open(str(LOGO_PATH)).resize((55, 55))
+            img.paste(logo, (10, 8))
         except Exception:
             pass
+    draw.text((75, 12), "O'ZGIDROMET", fill="#FFFFFF", font=get_font(20, True))
+    draw.text((75, 40), "Gidrometeorologiya xizmati", fill="#B0C4DE", font=get_font(12))
+    draw.text((W//2, 15), "HARORAT XARITASI", fill="#FFFFFF", font=get_font(18, True), anchor="mt")
+    draw.text((W//2, 45), date_label, fill="#B0C4DE", font=get_font(12), anchor="mt")
 
-    fig.text(0.07, 0.965, "O\u2018ZGIDROMET", fontsize=14, fontweight="bold",
-             color="white", va="center", zorder=30)
-    fig.text(0.07, 0.935, "Gidrometeorologiya xizmati agentligi",
-             fontsize=8, color="#B0C4DE", va="center", zorder=30)
-    fig.text(0.55, 0.955, "HARORAT XARITASI", fontsize=14, fontweight="bold",
-             color="white", ha="center", va="center", zorder=30)
-    fig.text(0.55, 0.93, date_label, fontsize=9, color="#B0C4DE",
-             ha="center", va="center", zorder=30)
+    # XARITA CHIZISH
+    geojson_path = download_geojson()
+    map_top = 80
+    map_h = H - 130
+    map_w = W - 40
 
-    # XARITA
-    ax = fig.add_axes([0.02, 0.08, 0.96, 0.82])
-    ax.set_aspect("equal")
-    ax.axis("off")
-
-    centroids = {}
     if geojson_path and geojson_path.exists():
         with open(geojson_path, "r", encoding="utf-8") as f:
             geojson = json.load(f)
 
-        for feature in geojson.get("features", []):
-            props = feature.get("properties", {})
+        # Bounds hisoblash
+        all_lons, all_lats = [], []
+        for feat in geojson.get("features", []):
+            geom = feat["geometry"]
+            rings = []
+            if geom["type"] == "Polygon":
+                rings = geom["coordinates"]
+            elif geom["type"] == "MultiPolygon":
+                for mp in geom["coordinates"]:
+                    rings.extend(mp)
+            for ring in rings:
+                for lon, lat in ring:
+                    all_lons.append(lon)
+                    all_lats.append(lat)
+
+        bounds = (min(all_lons), min(all_lats), max(all_lons), max(all_lats))
+
+        def to_px(lon, lat):
+            return geo_to_pixel(lon, lat, bounds, map_w, map_h, padding=30)
+
+        # Viloyatlarni chizish
+        centroids = {}
+        for feat in geojson.get("features", []):
+            props = feat.get("properties", {})
             region_name = props.get("name") or props.get("NAME_1") or ""
-            geom = feature.get("geometry", {})
-            geom_type = geom.get("type", "")
+            geom = feat["geometry"]
             city = get_city_for_region(region_name)
             info = cities_data.get(city, {}) if city else {}
             tmax = info.get("temp_max") if info else None
-            fill_color = temp_to_color(tmax)
+            fill = temp_to_color(tmax)
 
-            all_rings = []
-            if geom_type == "Polygon":
-                all_rings = geom.get("coordinates", [])
-            elif geom_type == "MultiPolygon":
-                for mp in geom.get("coordinates", []):
-                    all_rings.extend(mp)
+            rings = []
+            if geom["type"] == "Polygon":
+                rings = geom["coordinates"]
+            elif geom["type"] == "MultiPolygon":
+                for mp in geom["coordinates"]:
+                    rings.extend(mp)
 
-            largest_ring = None
-            largest_area = 0
-            for ring in all_rings:
-                coords = np.array(ring)
-                poly = Polygon(coords, closed=True, facecolor=fill_color,
-                               edgecolor="#2C3E50", linewidth=0.8, zorder=5)
-                ax.add_patch(poly)
-                area = abs(np.sum(coords[:-1,0]*coords[1:,1] - coords[1:,0]*coords[:-1,1])/2)
-                if area > largest_area:
-                    largest_area = area
-                    largest_ring = ring
+            largest_ring = max(rings, key=len) if rings else None
+
+            for ring in rings:
+                pixels = [(20 + to_px(lon, lat)[0], map_top + to_px(lon, lat)[1]) for lon, lat in ring]
+                if len(pixels) >= 3:
+                    draw.polygon(pixels, fill=fill, outline="#2C3E50")
 
             if city and largest_ring:
-                centroids[city] = polygon_centroid(largest_ring)
+                cx = sum(p[0] for p in largest_ring) / len(largest_ring)
+                cy = sum(p[1] for p in largest_ring) / len(largest_ring)
+                px, py = to_px(cx, cy)
+                centroids[city] = (20 + px, map_top + py)
 
-        ax.autoscale_view()
-
-        # Viloyat nomlari + harorat (katta shrift, oq stroke)
-        stroke = [pe.withStroke(linewidth=3.5, foreground="white")]
-        for city, (cx, cy) in centroids.items():
+        # Viloyat nomlari + harorat
+        font_name = get_font(13, True)
+        font_temp = get_font(15, True)
+        for city, (px, py) in centroids.items():
             info = cities_data.get(city, {})
             tmax = info.get("temp_max") if info else None
-            name = SHORT_NAMES.get(city, city)
+
+            # Oq fon doira
+            draw.ellipse([(px-28, py-20), (px+28, py+20)], fill="#FFFFFFCC", outline=None)
 
             # Nom
-            ax.text(cx, cy + 0.08, name, ha="center", va="center",
-                    fontsize=7, fontweight="bold", color="#1A2332",
-                    path_effects=stroke, zorder=25)
+            draw.text((px, py-8), city[:5], fill="#1A2332", font=get_font(10, True), anchor="mm")
+
             # Harorat
             if tmax is not None:
-                tmin = info.get("temp_min")
-                t_str = f"{tmin}\u00b0\u2013{tmax}\u00b0" if tmin else f"{tmax}\u00b0"
-                ax.text(cx, cy - 0.12, t_str, ha="center", va="center",
-                        fontsize=8, fontweight="bold", color="#C62828",
-                        path_effects=stroke, zorder=25)
+                draw.text((px, py+8), f"{tmax}\u00b0", fill="#C62828", font=font_temp, anchor="mm")
 
-    # Colorbar
-    from matplotlib.colors import ListedColormap, BoundaryNorm
-    levels = [15, 20, 25, 28, 30, 32, 34, 36, 38, 40, 42]
-    colors = ["#B39DDB","#90CAF9","#80DEEA","#80CBC4","#A5D6A7",
-              "#C5E1A5","#E6EE9C","#FFF59D","#FFE082","#FFCC80","#FFAB91"]
-    cmap = ListedColormap(colors)
-    norm = BoundaryNorm(levels, ncolors=len(colors), clip=True)
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
-    cax = fig.add_axes([0.15, 0.04, 0.70, 0.018])
-    cbar = fig.colorbar(sm, cax=cax, orientation="horizontal",
-                        boundaries=levels, ticks=levels)
-    cbar.ax.tick_params(labelsize=7)
-    cbar.set_label("Kunduzgi harorat, \u00b0C", fontsize=8)
+    # FOOTER (colorbar placeholder)
+    draw.rectangle([(0, H-50), (W, H)], fill="#F5F7FA")
+    draw.text((W//2, H-30), "Harorat skalasi: 15\u00b0...42\u00b0C+", fill="#546E7A", font=get_font(11), anchor="mm")
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output_path, dpi=dpi, bbox_inches="tight",
-                facecolor="white", pad_inches=0.02)
-    plt.close(fig)
+    img.save(output_path, "PNG")
     return output_path
 
 
 # ===========================================================
-# 2-RASM: JADVAL + FOOTER
+# 2-RASM: JADVAL
 # ===========================================================
-def render_table_image(day_data, output_path, dpi=180):
-    """Guruhlar jadvali + ijtimoiy tarmoqlar."""
+def render_table_image(day_data, output_path):
     cities_data = day_data.get("cities", {})
     comment = day_data.get("comment", "")
     date_str = day_data.get("date", "")
@@ -234,71 +230,53 @@ def render_table_image(day_data, output_path, dpi=180):
         dt = datetime.now()
     date_label = f"{dt.day} {MONTHS_UZ[dt.month-1]} {dt.year}, {DAYS_UZ[dt.weekday()]}"
 
-    fig = plt.figure(figsize=(10, 8), facecolor="white", dpi=dpi)
+    W, H = 1200, 1000
+    img = Image.new("RGB", (W, H), "#FFFFFF")
+    draw = ImageDraw.Draw(img)
 
     # HEADER
-    fig.patches.append(Rectangle((0, 0.91), 1, 0.09,
-        transform=fig.transFigure, facecolor="#0B3D8F", edgecolor="none", zorder=0))
-
+    draw.rectangle([(0, 0), (W, 70)], fill="#0B3D8F")
     if LOGO_PATH.exists():
         try:
-            logo_ax = fig.add_axes([0.01, 0.92, 0.055, 0.07], zorder=30)
-            logo_ax.imshow(Image.open(str(LOGO_PATH)))
-            logo_ax.axis("off")
+            logo = Image.open(str(LOGO_PATH)).resize((55, 55))
+            img.paste(logo, (10, 8))
         except Exception:
             pass
-
-    fig.text(0.08, 0.965, "O\u2018ZGIDROMET", fontsize=13, fontweight="bold",
-             color="white", va="center", zorder=30)
-    fig.text(0.08, 0.935, "Gidrometeorologiya xizmati agentligi",
-             fontsize=7.5, color="#B0C4DE", va="center", zorder=30)
-    fig.text(0.55, 0.955, "VILOYATLAR BO\u2018YICHA PROGNOZ", fontsize=13,
-             fontweight="bold", color="white", ha="center", va="center", zorder=30)
-    fig.text(0.55, 0.925, date_label, fontsize=9, color="#B0C4DE",
-             ha="center", va="center", zorder=30)
+    draw.text((75, 12), "O'ZGIDROMET", fill="#FFFFFF", font=get_font(18, True))
+    draw.text((75, 40), "Gidrometeorologiya xizmati", fill="#B0C4DE", font=get_font(11))
+    draw.text((W//2, 15), "VILOYATLAR BO'YICHA PROGNOZ", fill="#FFFFFF", font=get_font(16, True), anchor="mt")
+    draw.text((W//2, 45), date_label, fill="#B0C4DE", font=get_font(11), anchor="mt")
 
     # JADVAL
-    ax = fig.add_axes([0.03, 0.18, 0.94, 0.70])
-    ax.axis("off")
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-
     GROUPS = [
         {"name": "Toshkent shahri", "cities": ["Toshkent"]},
-        {"name": "Qoraqalpog\u2018iston Resp., Xorazm viloyati", "cities": ["Nukus", "Urganch"]},
+        {"name": "Qoraqalpog'iston R., Xorazm", "cities": ["Nukus", "Urganch"]},
         {"name": "Buxoro viloyati", "cities": ["Buxoro"]},
         {"name": "Navoiy viloyati", "cities": ["Navoiy"]},
-        {"name": "Toshkent, Samarqand, Jizzax, Sirdaryo viloyatlari", "cities": ["Toshkent", "Samarqand", "Jizzax", "Guliston"]},
-        {"name": "Qashqadaryo va Surxondaryo viloyatlari", "cities": ["Qarshi", "Termiz"]},
-        {"name": "Andijon, Namangan, Farg\u2018ona viloyatlari", "cities": ["Andijon", "Namangan", "Farg'ona"]},
-        {"name": "Tog\u2018 oldi va tog\u2018li hududlar", "cities": ["Toshkent", "Namangan"]},
+        {"name": "Toshkent, Samarqand, Jizzax, Sirdaryo", "cities": ["Toshkent", "Samarqand", "Jizzax", "Guliston"]},
+        {"name": "Qashqadaryo, Surxondaryo", "cities": ["Qarshi", "Termiz"]},
+        {"name": "Andijon, Namangan, Farg'ona", "cities": ["Andijon", "Namangan", "Farg'ona"]},
+        {"name": "Tog' oldi va tog'li hududlar", "cities": ["Toshkent", "Namangan"]},
     ]
 
-    # Jadval sarlavhasi
-    cols = [0.01, 0.52, 0.68, 0.85]
-    y_h = 0.96
-    ax.text(cols[0], y_h, "HUDUD", fontsize=9, fontweight="bold",
-            color="#0B3D8F", transform=ax.transAxes)
-    ax.text(cols[1], y_h, "KECHASI", fontsize=9, fontweight="bold",
-            color="#1565C0", transform=ax.transAxes)
-    ax.text(cols[2], y_h, "KUNDUZI", fontsize=9, fontweight="bold",
-            color="#C62828", transform=ax.transAxes)
-    ax.text(cols[3], y_h, "SHAMOL", fontsize=9, fontweight="bold",
-            color="#37474F", transform=ax.transAxes)
+    # Sarlavha
+    y = 90
+    cols = [30, 550, 750, 950]
+    draw.text((cols[0], y), "HUDUD", fill="#0B3D8F", font=get_font(14, True))
+    draw.text((cols[1], y), "KECHASI", fill="#1565C0", font=get_font(14, True))
+    draw.text((cols[2], y), "KUNDUZI", fill="#C62828", font=get_font(14, True))
+    draw.text((cols[3], y), "SHAMOL", fill="#37474F", font=get_font(14, True))
+    y += 30
+    draw.line([(20, y), (W-20, y)], fill="#B0BEC5", width=2)
+    y += 15
 
-    ax.axhline(y=0.94, xmin=0.01, xmax=0.99, color="#B0BEC5",
-               linewidth=1, transform=ax.transAxes)
-
-    y0 = 0.90
-    row_h = 0.11
+    row_h = 75
     for i, group in enumerate(GROUPS):
-        y = y0 - i * row_h
+        gy = y + i * row_h
 
         # Zebra
         if i % 2 == 0:
-            ax.add_patch(Rectangle((0, y-0.04), 1, row_h,
-                transform=ax.transAxes, facecolor="#F5F9FC",
-                edgecolor="none", zorder=1))
+            draw.rectangle([(20, gy-5), (W-20, gy+row_h-10)], fill="#F5F9FC")
 
         # Ma'lumot
         tmins, tmaxs, winds = [], [], []
@@ -313,69 +291,68 @@ def render_table_image(day_data, output_path, dpi=180):
         day_t = f"{min(tmaxs)}-{max(tmaxs)}\u00b0" if tmaxs else "\u2014"
         wind = f"{min(winds)}-{max(winds)} m/s" if winds else "\u2014"
 
-        ax.text(cols[0], y, group["name"], fontsize=8.5, color="#1A2332",
-                fontweight="bold", va="center", transform=ax.transAxes, zorder=5)
-        ax.text(cols[1], y, night, fontsize=10, color="#1565C0",
-                fontweight="bold", va="center", transform=ax.transAxes, zorder=5)
-        ax.text(cols[2], y, day_t, fontsize=11, color="#C62828",
-                fontweight="bold", va="center", transform=ax.transAxes, zorder=5)
-        ax.text(cols[3], y, wind, fontsize=8.5, color="#37474F",
-                va="center", transform=ax.transAxes, zorder=5)
+        draw.text((cols[0], gy+10), group["name"], fill="#1A2332", font=get_font(13, True))
+        draw.text((cols[1], gy+8), night, fill="#1565C0", font=get_font(16, True))
+        draw.text((cols[2], gy+5), day_t, fill="#C62828", font=get_font(18, True))
+        draw.text((cols[3], gy+10), wind, fill="#37474F", font=get_font(13))
 
     # DIQQAT
+    warn_y = y + len(GROUPS) * row_h + 10
     if comment:
-        warn_y = y0 - len(GROUPS) * row_h - 0.02
-        ax.add_patch(FancyBboxPatch(
-            (0.01, warn_y-0.015), 0.98, 0.055, transform=ax.transAxes,
-            boxstyle="round,pad=0.008", facecolor="#FFF3E0",
-            edgecolor="#FF6F00", linewidth=1, zorder=10))
-        ax.text(0.03, warn_y + 0.01, f"\u26a0\ufe0f {comment}",
-                fontsize=8.5, color="#E65100", va="center",
-                fontweight="bold", transform=ax.transAxes, zorder=11)
+        draw.rounded_rectangle([(20, warn_y), (W-20, warn_y+50)], radius=8, fill="#FFF3E0", outline="#FF6F00")
+        draw.text((35, warn_y+12), f"\u26a0 {comment}", fill="#E65100", font=get_font(13, True))
+        warn_y += 60
 
     # FOOTER — ijtimoiy tarmoqlar
-    fig.patches.append(Rectangle((0, 0), 1, 0.14,
-        transform=fig.transFigure, facecolor="#F0F4F8",
-        edgecolor="#CFD8DC", linewidth=0.5, zorder=0))
+    footer_y = max(warn_y + 20, H - 150)
+    draw.rectangle([(0, footer_y), (W, H)], fill="#F0F4F8")
+    draw.line([(0, footer_y), (W, footer_y)], fill="#CFD8DC", width=1)
 
-    fig.text(0.50, 0.115, f"\u00a9 {dt.year} O\u2018zbekiston Respublikasi Gidrometeorologiya xizmati agentligi",
-             fontsize=9, fontweight="bold", color="#263238", ha="center")
+    draw.text((W//2, footer_y+15), f"\u00a9 {dt.year} O'zbekiston Respublikasi Gidrometeorologiya xizmati agentligi",
+              fill="#263238", font=get_font(12, True), anchor="mt")
 
-    # Ijtimoiy tarmoqlar (katta, aniq)
-    links_y = 0.07
-    fig.text(0.10, links_y, "\U0001F310  uzgidromet.uz", fontsize=9, color="#0B3D8F", ha="center")
-    fig.text(0.30, links_y, "\U0001F4F1  t.me/uzgidromet", fontsize=9, color="#0088CC", ha="center")
-    fig.text(0.52, links_y, "\U0001F4F7  instagram.com/uzgidromet.uz", fontsize=9, color="#C13584", ha="center")
-    fig.text(0.77, links_y, "\U0001F44D  facebook.com/uzgidromet.uz", fontsize=9, color="#1877F2", ha="center")
+    # Linklar
+    ly = footer_y + 50
+    links = [
+        ("\U0001F310 uzgidromet.uz", "#0B3D8F"),
+        ("\U0001F4F1 t.me/uzgidromet", "#0088CC"),
+        ("\U0001F4F7 instagram.com/uzgidromet.uz", "#C13584"),
+    ]
+    links2 = [
+        ("\U0001F44D facebook.com/uzgidromet.uz", "#1877F2"),
+        ("\U0001F3AC youtube.com/@uzgidromet_", "#FF0000"),
+    ]
 
-    fig.text(0.50, 0.025, "\U0001F3AC  youtube.com/@uzgidromet_", fontsize=9,
-             color="#FF0000", ha="center")
+    x_pos = 50
+    for text, color in links:
+        draw.text((x_pos, ly), text, fill=color, font=get_font(12))
+        x_pos += 350
 
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output_path, dpi=dpi, bbox_inches="tight",
-                facecolor="white", pad_inches=0.02)
-    plt.close(fig)
+    x_pos = 200
+    for text, color in links2:
+        draw.text((x_pos, ly+35), text, fill=color, font=get_font(12))
+        x_pos += 400
+
+    img.save(output_path, "PNG")
     return output_path
 
 
 # ===========================================================
-# ASOSIY FUNKSIYA (server.py uchun)
+# ASOSIY (server.py uchun)
 # ===========================================================
-def render_forecast_card(day_data, output_path, dpi=180):
-    """2 ta rasm generatsiya: xarita + jadval."""
+def render_forecast_card(day_data, output_path, dpi=150):
+    """2 ta rasm: xarita + jadval."""
     base = Path(output_path)
     stem = base.stem
     parent = base.parent
+    parent.mkdir(parents=True, exist_ok=True)
 
-    # 1-rasm: xarita
     map_path = str(parent / f"{stem}_map.png")
-    render_map_image(day_data, map_path, dpi=dpi)
+    render_map_image(day_data, map_path)
 
-    # 2-rasm: jadval
     tbl_path = str(parent / f"{stem}_table.png")
-    render_table_image(day_data, tbl_path, dpi=dpi)
+    render_table_image(day_data, tbl_path)
 
-    # Asosiy faylga xaritani saqlash (preview uchun)
-    render_map_image(day_data, output_path, dpi=dpi)
-
+    # Asosiy fayl = xarita
+    render_map_image(day_data, output_path)
     return output_path
