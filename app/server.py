@@ -60,6 +60,12 @@ except (OSError, PermissionError):
     OUTPUT_DIR = Path("/tmp/output")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# Rasmlarni serve qilish uchun route
+@app.route("/output/<path:filename>")
+def serve_output(filename):
+    """Generatsiya qilingan rasmlarni serve qilish."""
+    return send_from_directory(str(OUTPUT_DIR), filename)
+
 # Database init
 init_db(app)
 
@@ -160,9 +166,9 @@ def generate():
                     map_path = OUTPUT_DIR / map_filename
                     tbl_path = OUTPUT_DIR / tbl_filename
                     if map_path.exists():
-                        images.append(f"/static/output/{map_filename}")
+                        images.append(f"/output/{map_filename}")
                     if tbl_path.exists():
-                        images.append(f"/static/output/{tbl_filename}")
+                        images.append(f"/output/{tbl_filename}")
                 except Exception as e:
                     print(f"[card_renderer] xatolik: {e}")
                     import traceback
@@ -297,7 +303,7 @@ def render_map_api(forecast_id):
         filename = f"forecast_{forecast_id}_day{i+1}.png"
         output_path = str(OUTPUT_DIR / filename)
         render_forecast_map(day_data, output_path)
-        images.append(f"/static/output/{filename}")
+        images.append(f"/output/{filename}")
 
         # DB ga rasm yo'lini saqlash
         if i == 0:
