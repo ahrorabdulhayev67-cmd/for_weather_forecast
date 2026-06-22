@@ -3,16 +3,28 @@
  * Manba: uzb_admbnda_adm1_2018b (UN OCHA)
  */
 
-// Geo -> SVG koordinata o'girish
+// Geo -> SVG koordinata o'girish (parametrli)
 const MAP_BOUNDS = {
     minLon: 55.9, maxLon: 73.2,
-    minLat: 37.1, maxLat: 45.6,
-    width: 1060, height: 600
+    minLat: 37.1, maxLat: 45.6
 };
 
+// Default: to'liq kenglikda (agar panel layout bo'lmasa)
+let MAP_OFFSET_X = 30;
+let MAP_OFFSET_Y = 90;
+let MAP_WIDTH = 680;
+let MAP_HEIGHT = 500;
+
+function setMapViewport(ox, oy, w, h) {
+    MAP_OFFSET_X = ox;
+    MAP_OFFSET_Y = oy;
+    MAP_WIDTH = w;
+    MAP_HEIGHT = h;
+}
+
 function geoToSvg(lon, lat) {
-    const x = 50 + ((lon - MAP_BOUNDS.minLon) / (MAP_BOUNDS.maxLon - MAP_BOUNDS.minLon)) * MAP_BOUNDS.width;
-    const y = 85 + MAP_BOUNDS.height - ((lat - MAP_BOUNDS.minLat) / (MAP_BOUNDS.maxLat - MAP_BOUNDS.minLat)) * MAP_BOUNDS.height;
+    const x = MAP_OFFSET_X + ((lon - MAP_BOUNDS.minLon) / (MAP_BOUNDS.maxLon - MAP_BOUNDS.minLon)) * MAP_WIDTH;
+    const y = MAP_OFFSET_Y + MAP_HEIGHT - ((lat - MAP_BOUNDS.minLat) / (MAP_BOUNDS.maxLat - MAP_BOUNDS.minLat)) * MAP_HEIGHT;
     return [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
 }
 
