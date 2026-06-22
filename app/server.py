@@ -64,7 +64,7 @@ except (OSError, PermissionError):
 @app.route("/output/<path:filename>")
 def serve_output(filename):
     """Generatsiya qilingan rasmlarni serve qilish."""
-    return send_from_directory(str(OUTPUT_DIR), filename)
+    return send_from_directory(str(OUTPUT_DIR), filename, mimetype="image/png")
 
 # Database init
 init_db(app)

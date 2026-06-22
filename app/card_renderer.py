@@ -194,21 +194,35 @@ def render_map_image(day_data, output_path):
                 centroids[city] = (20 + px, map_top + py)
 
         # Viloyat nomlari + harorat
-        font_name = get_font(13, True)
-        font_temp = get_font(15, True)
+        # Viloyat to'liq nomlari
+        FULL_NAMES = {
+            "Toshkent":"Toshkent","Samarqand":"Samarqand","Buxoro":"Buxoro",
+            "Namangan":"Namangan","Andijon":"Andijon","Farg'ona":"Farg'ona",
+            "Qarshi":"Qashqadaryo","Nukus":"Qoraqalpog'.","Navoiy":"Navoiy",
+            "Termiz":"Surxondaryo","Jizzax":"Jizzax","Urganch":"Xorazm",
+            "Guliston":"Sirdaryo",
+        }
+        font_name = get_font(11, True)
+        font_temp = get_font(13, True)
         for city, (px, py) in centroids.items():
             info = cities_data.get(city, {})
             tmax = info.get("temp_max") if info else None
+            tmin = info.get("temp_min") if info else None
 
-            # Oq fon doira
-            draw.ellipse([(px-28, py-20), (px+28, py+20)], fill="#FFFFFFCC", outline=None)
+            # Oq fon doira (kattaroq)
+            draw.ellipse([(px-35, py-22), (px+35, py+22)], fill="#FFFFFF", outline="#E0E0E0")
 
-            # Nom
-            draw.text((px, py-8), city[:5], fill="#1A2332", font=get_font(10, True), anchor="mm")
+            # Viloyat to'liq nomi
+            full_name = FULL_NAMES.get(city, city)
+            draw.text((px, py-10), full_name, fill="#1A2332", font=get_font(9, True), anchor="mm")
 
-            # Harorat
+            # Harorat INTERVAL (min-max)
             if tmax is not None:
-                draw.text((px, py+8), f"{tmax}\u00b0", fill="#C62828", font=font_temp, anchor="mm")
+                if tmin is not None:
+                    temp_str = f"{tmin}\u00b0-{tmax}\u00b0"
+                else:
+                    temp_str = f"{tmax}\u00b0"
+                draw.text((px, py+8), temp_str, fill="#C62828", font=font_temp, anchor="mm")
 
     # FOOTER (colorbar placeholder)
     draw.rectangle([(0, H-50), (W, H)], fill="#F5F7FA")
@@ -321,7 +335,7 @@ def render_table_image(day_data, output_path):
     socials = [
         ("web.png", "uzgidromet.uz"),
         ("telegram.png", "t.me/uzgidromet"),
-        ("instagram.jpg", "instagram.com/uzgidromet.uz"),
+        ("instagram.png", "instagram.com/uzgidromet.uz"),
         ("facebook.png", "facebook.com/uzgidromet.uz"),
         ("youtube.png", "youtube.com/@uzgidromet_"),
     ]
