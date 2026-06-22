@@ -2,6 +2,7 @@
 Ma'lumotlar bazasi modellari — prognozlar arxivi.
 SQLite + Flask-SQLAlchemy
 """
+import os
 import json
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
@@ -69,13 +70,24 @@ class Forecast(db.Model):
 
 def init_db(app):
     """Ma'lumotlar bazasini Flask ilovaga ulash."""
+    # Render'da /tmp yozish mumkin, app root'da esa yo'q
+    import tempfile
     basedir = app.root_path
-    db_path = f"sqlite:///{basedir}/data/forecasts.db"
+    data_dir = os.path.join(basedir, "data")
+    try:
+        os.makedirs(data_dir, exist_ok=True)
+        # Test yozish
+        test_file = os.path.join(data_dir, ".write_test")
+        with open(test_file, "w") as f:
+            f.write("ok")
+        os.remove(test_file)
+        db_path = f"sqlite:///{data_dir}/forecasts.db"
+    except (OSError, PermissionError):
+        # Fallback: /tmp ga yozish
+        db_path = f"sqlite:////tmp/forecasts.db"
+
     app.config["SQLALCHEMY_DATABASE_URI"] = db_path
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     db.init_app(app)
     with app.app_context():
-        # data papkasini yaratish
-        import os
-        os.makedirs(f"{basedir}/data", exist_ok=True)
         db.create_all()

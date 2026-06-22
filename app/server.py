@@ -47,8 +47,18 @@ except ImportError:
     HAS_TELEGRAM = False
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
-OUTPUT_DIR = Path("static/output")
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Output directory (Render'da /tmp ishlatish)
+try:
+    OUTPUT_DIR = Path("static/output")
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    # Test yozish
+    test_f = OUTPUT_DIR / ".test"
+    test_f.write_text("ok")
+    test_f.unlink()
+except (OSError, PermissionError):
+    OUTPUT_DIR = Path("/tmp/output")
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Database init
 init_db(app)
