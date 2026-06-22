@@ -198,7 +198,7 @@ def render_map_image(day_data, output_path):
         FULL_NAMES = {
             "Toshkent":"Toshkent","Samarqand":"Samarqand","Buxoro":"Buxoro",
             "Namangan":"Namangan","Andijon":"Andijon","Farg'ona":"Farg'ona",
-            "Qarshi":"Qashqadaryo","Nukus":"Qoraqalpog'.","Navoiy":"Navoiy",
+            "Qarshi":"Qashqadaryo","Nukus":"Qoraqalp.","Navoiy":"Navoiy",
             "Termiz":"Surxondaryo","Jizzax":"Jizzax","Urganch":"Xorazm",
             "Guliston":"Sirdaryo",
         }
@@ -249,7 +249,7 @@ def render_table_image(day_data, output_path):
         dt = datetime.now()
     date_label = f"{dt.day} {MONTHS_UZ[dt.month-1]} {dt.year}, {DAYS_UZ[dt.weekday()]}"
 
-    W, H = 1400, 1000
+    W, H = 1500, 1000
     img = Image.new("RGB", (W, H), "#FFFFFF")
     draw = ImageDraw.Draw(img)
 
@@ -280,19 +280,19 @@ def render_table_image(day_data, output_path):
 
     # Sarlavha
     y = 90
-    cols = [30, 420, 560, 700, 840, 1000]
+    cols = [30, 420, 560, 700, 870, 1050]
     draw.text((cols[0], y), "HUDUD", fill="#0B3D8F", font=get_font(12, True))
     draw.text((cols[1], y), "KECHASI", fill="#1565C0", font=get_font(12, True))
     draw.text((cols[2], y), "KUNDUZI", fill="#C62828", font=get_font(12, True))
-    draw.text((cols[3], y), "SHAMOL", fill="#37474F", font=get_font(12, True))
-    draw.text((cols[4], y), "YOG'IN", fill="#0277BD", font=get_font(12, True))
+    draw.text((cols[3], y), "Shamol tezligi", fill="#37474F", font=get_font(11, True))
+    draw.text((cols[4], y), "Yog'ingarchilik", fill="#0277BD", font=get_font(11, True))
     draw.text((cols[5], y), "HODISA", fill="#4A148C", font=get_font(12, True))
     y += 30
     draw.line([(20, y), (W-20, y)], fill="#B0BEC5", width=2)
     y += 15
 
     WEATHER_LABELS = {
-        "ochiq":"Ochiq","qisman_bulutli":"Qis. bulutli","bulutli":"Bulutli",
+        "ochiq":"Ochiq","qisman_bulutli":"Qisman bulutli","bulutli":"Bulutli",
         "yomgir":"Yomg'ir","jala":"Jala","momaqaldiroq":"Momaqaldiroq",
         "qor":"Qor","dol":"Do'l","tuman":"Tuman",
         "chang_boroni":"Chang bo'roni","qor_boroni":"Qor bo'roni"
@@ -318,10 +318,24 @@ def render_table_image(day_data, output_path):
             if info.get("precip") is not None: precips.append(info["precip"])
             if info.get("weather"): weather_val = info["weather"]
 
-        night = f"{min(tmins)}-{max(tmins)}\u00b0" if tmins else "\u2014"
-        day_t = f"{min(tmaxs)}-{max(tmaxs)}\u00b0" if tmaxs else "\u2014"
-        wind = f"{min(winds)}-{max(winds)} m/s" if winds else "\u2014"
-        precip_str = f"{max(precips)} mm" if precips and max(precips) > 0 else "\u2014"
+        # Takror oldini olish: min==max bo'lsa faqat 1 ta
+        if tmins:
+            night = f"{min(tmins)}\u00b0" if min(tmins) == max(tmins) else f"{min(tmins)}-{max(tmins)}\u00b0"
+        else:
+            night = "\u2014"
+        if tmaxs:
+            day_t = f"{min(tmaxs)}\u00b0" if min(tmaxs) == max(tmaxs) else f"{min(tmaxs)}-{max(tmaxs)}\u00b0"
+        else:
+            day_t = "\u2014"
+        if winds:
+            wind = f"{min(winds)} m/s" if min(winds) == max(winds) else f"{min(winds)}-{max(winds)} m/s"
+        else:
+            wind = "\u2014"
+        if precips:
+            p_max = max(precips)
+            precip_str = f"{p_max} mm" if p_max > 0 else "0 mm"
+        else:
+            precip_str = "0 mm"
         hodisa = WEATHER_LABELS.get(weather_val, "Ochiq")
 
         draw.text((cols[0], gy+10), group["name"], fill="#1A2332", font=get_font(11, True))
@@ -329,7 +343,7 @@ def render_table_image(day_data, output_path):
         draw.text((cols[2], gy+5), day_t, fill="#C62828", font=get_font(16, True))
         draw.text((cols[3], gy+10), wind, fill="#37474F", font=get_font(11))
         draw.text((cols[4], gy+10), precip_str, fill="#0277BD", font=get_font(11))
-        draw.text((cols[5], gy+10), hodisa, fill="#4A148C", font=get_font(11, True))
+        draw.text((cols[5], gy+10), hodisa, fill="#4A148C", font=get_font(11))
 
     # DIQQAT
     warn_y = y + len(GROUPS) * row_h + 10
@@ -405,6 +419,7 @@ def render_wind_map(day_data, output_path):
         except Exception:
             pass
     draw.text((75, 12), "O'ZGIDROMET", fill="#FFFFFF", font=get_font(20, True))
+    draw.text((75, 40), "Gidrometeorologiya xizmati agentligi", fill="#B0C4DE", font=get_font(11))
     draw.text((W//2, 15), "SHAMOL TEZLIGI XARITASI", fill="#FFFFFF", font=get_font(18, True), anchor="mt")
     draw.text((W//2, 45), date_label, fill="#B0C4DE", font=get_font(12), anchor="mt")
 
@@ -467,12 +482,15 @@ def render_wind_map(day_data, output_path):
         for city, (px, py) in centroids.items():
             info = cities_data.get(city, {})
             wind = info.get("wind") if info else None
+            # Viloyat nomi
+            draw.text((px, py-18), city[:8], fill="#1A2332", font=get_font(8, True), anchor="mm")
+            # Shamol qiymati
             if wind:
-                draw.ellipse([(px-25, py-15), (px+25, py+15)], fill="#FFFFFF", outline="#4CAF50")
-                draw.text((px, py), f"{wind} m/s", fill="#1B5E20", font=get_font(11, True), anchor="mm")
+                draw.ellipse([(px-25, py-5), (px+25, py+15)], fill="#FFFFFF", outline="#4CAF50")
+                draw.text((px, py+5), f"{wind} m/s", fill="#1B5E20", font=get_font(10, True), anchor="mm")
 
     draw.rectangle([(0, H-40), (W, H)], fill="#1B5E20")
-    draw.text((W//2, H-22), "O'ZGIDROMET  |  hydromet.uz", fill="#B0C4DE", font=get_font(10), anchor="mm")
+    draw.text((W//2, H-22), "O'ZGIDROMET  |  Gidrometeorologiya xizmati agentligi  |  hydromet.uz", fill="#B0C4DE", font=get_font(10), anchor="mm")
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     img.save(output_path, "PNG")
@@ -507,6 +525,7 @@ def render_precip_map(day_data, output_path):
         except Exception:
             pass
     draw.text((75, 12), "O'ZGIDROMET", fill="#FFFFFF", font=get_font(20, True))
+    draw.text((75, 40), "Gidrometeorologiya xizmati agentligi", fill="#B0C4DE", font=get_font(11))
     draw.text((W//2, 15), "YOG'INGARCHILIK XARITASI", fill="#FFFFFF", font=get_font(18, True), anchor="mt")
     draw.text((W//2, 45), date_label, fill="#B0C4DE", font=get_font(12), anchor="mt")
 
@@ -564,12 +583,14 @@ def render_precip_map(day_data, output_path):
         for city, (px, py) in centroids.items():
             info = cities_data.get(city, {})
             precip = info.get("precip", 0) if info else 0
-            if precip and precip > 0:
-                draw.ellipse([(px-22, py-12), (px+22, py+12)], fill="#FFFFFF", outline="#1565C0")
-                draw.text((px, py), f"{precip} mm", fill="#01579B", font=get_font(11, True), anchor="mm")
+            # Viloyat nomi
+            draw.text((px, py-18), city[:8], fill="#1A2332", font=get_font(8, True), anchor="mm")
+            # Yog'ingarchilik qiymati (0 ham ko'rsatiladi)
+            draw.ellipse([(px-22, py-5), (px+22, py+12)], fill="#FFFFFF", outline="#1565C0")
+            draw.text((px, py+3), f"{precip} mm", fill="#01579B", font=get_font(10, True), anchor="mm")
 
     draw.rectangle([(0, H-40), (W, H)], fill="#01579B")
-    draw.text((W//2, H-22), "O'ZGIDROMET  |  hydromet.uz", fill="#B0C4DE", font=get_font(10), anchor="mm")
+    draw.text((W//2, H-22), "O'ZGIDROMET  |  Gidrometeorologiya xizmati agentligi  |  hydromet.uz", fill="#B0C4DE", font=get_font(10), anchor="mm")
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     img.save(output_path, "PNG")
