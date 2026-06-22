@@ -283,12 +283,11 @@ function renderResultForDay(dayIndex, days) {
     for (var city in cities) {
         var info = cities[city];
         if (!info || info.temp_max == null) continue;
-        var tempStr = (info.temp_min != null ? info.temp_min + "\u00b0" : "") + "\u2013" + info.temp_max + "\u00b0C";
-        var wEmoji = WEATHER_EMOJI[info.weather] || "";
-        var wLabel = WEATHER_LABELS[info.weather] || "";
-        var windStr = info.wind ? info.wind + " m/s" : "\u2014";
+        var tempStr = (info.temp_min != null ? info.temp_min + "\u00b0\u2013" : "") + info.temp_max + "\u00b0C";
+        var badgeClass = getBadgeClass(info);
+        var badgeText = getBadgeText(info);
         var tr = document.createElement("tr");
-        tr.innerHTML = '<td>' + city + '</td><td><b>' + tempStr + '</b></td><td>' + wEmoji + ' ' + wLabel + '</td><td>' + windStr + '</td>';
+        tr.innerHTML = '<td>' + city + '</td><td>' + tempStr + '</td><td><span class="badge ' + badgeClass + '">' + badgeText + '</span></td>';
         tr.style.cursor = "pointer";
         tr.setAttribute("data-city", city);
         (function(c, ci) {
@@ -427,6 +426,31 @@ var REGION_NAMES = {
 };
 
 function getRegionName(city) { return REGION_NAMES[city] || ""; }
+
+function getBadgeClass(info) {
+    if (info.temp_max >= 40) return "b-red";
+    if (info.weather === "momaqaldiroq" || info.weather === "dol") return "b-amber";
+    if (info.weather === "yomgir" || info.weather === "jala") return "b-amber";
+    if (info.wind && info.wind >= 15) return "b-amber";
+    if (info.precip && info.precip >= 5) return "b-blue";
+    if (info.temp_max >= 35) return "b-amber";
+    return "b-blue";
+}
+
+function getBadgeText(info) {
+    if (info.temp_max >= 40) return "Issiqlik xavfi";
+    if (info.weather === "momaqaldiroq") return "Momaqaldiroq";
+    if (info.weather === "dol") return "Do\u2018l";
+    if (info.weather === "yomgir") return "Yomg\u2018ir";
+    if (info.weather === "jala") return "Jala";
+    if (info.weather === "qor") return "Qor";
+    if (info.wind && info.wind >= 15) return "Kuchli shamol";
+    if (info.precip && info.precip >= 5) return "Kuchli yog\u2018in";
+    if (info.weather === "ochiq") return "Ochiq";
+    if (info.weather === "qisman_bulutli") return "Qis. bulutli";
+    if (info.weather === "bulutli") return "Bulutli";
+    return WEATHER_LABELS[info.weather] || "Ochiq";
+}
 
 function getTempDescription(t) {
     if (t >= 42) return "Haddan tashqari issiq!";
