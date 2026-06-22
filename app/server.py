@@ -16,7 +16,14 @@ try:
 except ImportError:
     HAS_MAP_RENDERER = False
 
-# card_renderer — PIL asosida kartochka generatori
+# pro_renderer — matplotlib+geopandas professional 4-blokli render
+try:
+    from pro_renderer import render_pro_forecast
+    HAS_PRO_RENDERER = True
+except ImportError:
+    HAS_PRO_RENDERER = False
+
+# card_renderer — PIL asosida kartochka generatori (fallback)
 try:
     from card_renderer import render_forecast_card
     HAS_CARD_RENDERER = True
@@ -95,15 +102,32 @@ def generate():
             if i < 3:
                 telegrams.append(build_telegram_text(day, i))
 
-        # Rasm generatsiya (card_renderer mavjud bo'lsa)
+        # Rasm generatsiya: avval pro_renderer, keyin card_renderer (fallback)
         images = []
-        if HAS_CARD_RENDERER:
-            for i, day in enumerate(days):
-                if i >= 3:
-                    break
-                filename = f"prognoz_{forecast.id}_day{i+1}.png"
-                output_path = str(OUTPUT_DIR / filename)
-                render_forecast_card(day, output_path)
+        for i, day in enumerate(days):
+            if i >= 3:
+                break
+            filename = f"prognoz_{forecast.id}_day{i+1}.png"
+            output_path = str(OUTPUT_DIR / filename)
+
+            rendered = False
+            # 1) Professional renderer (matplotlib + geopandas)
+            if HAS_PRO_RENDERER and not rendered:
+                try:
+                    render_pro_forecast(day, output_path)
+                    rendered = True
+                except Exception as e:
+                    print(f"[pro_renderer] xatolik: {e}")
+
+            # 2) Fallback: PIL kartochka renderer
+            if HAS_CARD_RENDERER and not rendered:
+                try:
+                    render_forecast_card(day, output_path)
+                    rendered = True
+                except Exception as e:
+                    print(f"[card_renderer] xatolik: {e}")
+
+            if rendered:
                 images.append(f"/static/output/{filename}")
                 if i == 0:
                     forecast.image1_path = output_path
