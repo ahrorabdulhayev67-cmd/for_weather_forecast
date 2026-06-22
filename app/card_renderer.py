@@ -23,15 +23,15 @@ MONTHS_UZ = ["yanvar","fevral","mart","aprel","may","iyun",
 DAYS_UZ = ["dushanba","seshanba","chorshanba","payshanba","juma","shanba","yakshanba"]
 
 REGION_CITY_MAP = {
-    "Toshkent":"Toshkent","Tashkent":"Toshkent",
+    "Toshkent":"Toshkent","Tashkent":"Toshkent","Toshkent \u0448.":"Toshkent",
     "Samarqand":"Samarqand","Samarkand":"Samarqand",
     "Buxoro":"Buxoro","Bukhara":"Buxoro",
     "Namangan":"Namangan","Andijon":"Andijon","Andijan":"Andijon",
     "Farg'ona":"Farg'ona","Fergana":"Farg'ona","Fargona":"Farg'ona",
     "Qashqadaryo":"Qarshi","Kashkadarya":"Qarshi",
-    "Qoraqalpog'iston":"Nukus","Karakalpakstan":"Nukus",
+    "Qoraqalpog'iston Respublikasi":"Nukus","Qoraqalpog'iston":"Nukus","Karakalpakstan":"Nukus",
     "Navoiy":"Navoiy","Navoi":"Navoiy",
-    "Surxondaryo":"Termiz","Surkhandarya":"Termiz",
+    "Surxondaryo":"Termiz","Surxandaryo":"Termiz","Surkhandarya":"Termiz",
     "Jizzax":"Jizzax","Jizzakh":"Jizzax",
     "Xorazm":"Urganch","Khorezm":"Urganch",
     "Sirdaryo":"Guliston","Syrdarya":"Guliston",
@@ -70,6 +70,11 @@ def get_font(size, bold=False):
 
 
 def download_geojson():
+    """Lokal GeoJSON faylni olish (repoda mavjud)."""
+    local_path = Path(__file__).parent / "data" / "uzbekistan_regions.geojson"
+    if local_path.exists():
+        return local_path
+    # Fallback: yuklab olish
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     if GEOJSON_CACHE.exists():
         return GEOJSON_CACHE
@@ -303,35 +308,39 @@ def render_table_image(day_data, output_path):
         draw.text((35, warn_y+12), f"\u26a0 {comment}", fill="#E65100", font=get_font(13, True))
         warn_y += 60
 
-    # FOOTER — ijtimoiy tarmoqlar
-    footer_y = max(warn_y + 20, H - 150)
+    # FOOTER — ijtimoiy tarmoqlar (haqiqiy logolar bilan)
+    footer_y = max(warn_y + 20, H - 160)
     draw.rectangle([(0, footer_y), (W, H)], fill="#F0F4F8")
     draw.line([(0, footer_y), (W, footer_y)], fill="#CFD8DC", width=1)
 
     draw.text((W//2, footer_y+15), f"\u00a9 {dt.year} O'zbekiston Respublikasi Gidrometeorologiya xizmati agentligi",
               fill="#263238", font=get_font(12, True), anchor="mt")
 
-    # Linklar
-    ly = footer_y + 50
-    links = [
-        ("\U0001F310 uzgidromet.uz", "#0B3D8F"),
-        ("\U0001F4F1 t.me/uzgidromet", "#0088CC"),
-        ("\U0001F4F7 instagram.com/uzgidromet.uz", "#C13584"),
-    ]
-    links2 = [
-        ("\U0001F44D facebook.com/uzgidromet.uz", "#1877F2"),
-        ("\U0001F3AC youtube.com/@uzgidromet_", "#FF0000"),
+    # Ijtimoiy tarmoq logolari
+    SOCIAL_DIR = Path(__file__).parent / "static" / "social"
+    socials = [
+        ("web.png", "uzgidromet.uz"),
+        ("telegram.png", "t.me/uzgidromet"),
+        ("instagram.jpg", "instagram.com/uzgidromet.uz"),
+        ("facebook.png", "facebook.com/uzgidromet.uz"),
+        ("youtube.png", "youtube.com/@uzgidromet_"),
     ]
 
-    x_pos = 50
-    for text, color in links:
-        draw.text((x_pos, ly), text, fill=color, font=get_font(12))
-        x_pos += 350
-
-    x_pos = 200
-    for text, color in links2:
-        draw.text((x_pos, ly+35), text, fill=color, font=get_font(12))
-        x_pos += 400
+    ly = footer_y + 45
+    x_pos = 40
+    icon_size = 28
+    for icon_file, link_text in socials:
+        icon_path = SOCIAL_DIR / icon_file
+        if icon_path.exists():
+            try:
+                icon_img = Image.open(str(icon_path)).convert("RGBA")
+                icon_img = icon_img.resize((icon_size, icon_size), Image.LANCZOS)
+                # PNG transparency uchun
+                img.paste(icon_img, (x_pos, ly), icon_img if icon_img.mode == "RGBA" else None)
+            except Exception:
+                pass
+        draw.text((x_pos + icon_size + 6, ly + 5), link_text, fill="#37474F", font=get_font(11))
+        x_pos += 230
 
     img.save(output_path, "PNG")
     return output_path
