@@ -3,87 +3,261 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ob-havo prognozi — Gidrometeorologiya xizmati</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <title>O'zgidromet — Ob-havo Prognozi Tizimi</title>
+    <link rel="stylesheet" href="/static/styles.css"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- HEADER -->
-    <header class="header">
-        <div class="header-brand">
-            <img src="/static/uzhydromet-logo.jpg" alt="Logo" class="logo" onerror="this.style.display='none'">
-            <div class="header-text">
-                <h1>Gidrometeorologiya xizmati agentligi</h1>
-                <p>Ob-havo prognozi xarita generatori</p>
+
+<!-- HEADER -->
+<header class="header">
+    <div class="header-brand">
+        <img src="/static/uzhydromet-logo.jpg" alt="O'zgidromet" class="logo" onerror="this.style.display='none'"/>
+        <div class="header-text">
+            <h1>Gidrometeorologiya xizmati agentligi</h1>
+            <p>Qisqa muddatli ob-havo prognozi tizimi</p>
+        </div>
+    </div>
+    <div class="header-meta" id="headerDate"></div>
+</header>
+
+<!-- MAIN CONTENT -->
+<main class="main">
+
+    <!-- ===== MA'LUMOT KIRITISH PANELI ===== -->
+    <section class="panel" id="inputPanel">
+        <div class="panel-title">
+            <h2>📝 Prognoz ma'lumotlarini kiritish</h2>
+            <div class="panel-controls">
+                <button class="btn btn-outline" id="btnClearAll" title="Tozalash">🗑️ Tozalash</button>
+                <button class="btn btn-outline" id="btnLoadLast" title="Oxirgi ma'lumotlarni yuklash">📥 Yukla</button>
             </div>
         </div>
-        <div class="header-meta" id="currentDate"></div>
-    </header>
 
-    <main class="main">
-        <!-- MA'LUMOT KIRITISH PANELI -->
-        <div class="panel">
-            <div class="panel-title">
-                <h2>Prognoz ma'lumotlarini kiriting</h2>
-                <div class="panel-controls">
-                    <input type="date" id="forecastDate" class="date-input">
-                    <button class="btn btn-outline" id="btnLoadSample">Namuna</button>
+        <!-- KUN TABLARI -->
+        <div class="day-nav" id="dayNav">
+            <button class="day-btn active" data-day="0">I kun — <span class="day-date" id="dayDate0"></span></button>
+            <button class="day-btn" data-day="1">II kun — <span class="day-date" id="dayDate1"></span></button>
+            <button class="day-btn" data-day="2">III kun — <span class="day-date" id="dayDate2"></span></button>
+        </div>
+
+        <!-- SANA TANLASH -->
+        <div class="date-row">
+            <label>Boshlanish sanasi:</label>
+            <input type="date" id="startDate" />
+        </div>
+
+        <!-- JADVAL -->
+        <div class="table-container">
+            <table class="data-table" id="forecastTable">
+                <thead>
+                    <tr>
+                        <th>Shahar</th>
+                        <th>T min °C</th>
+                        <th>T max °C</th>
+                        <th>Ob-havo</th>
+                        <th>Shamol m/s</th>
+                        <th>Yog'in mm</th>
+                    </tr>
+                </thead>
+                <tbody id="forecastTableBody">
+                    <!-- JS orqali to'ldiriladi -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- IZOH -->
+        <div class="comment-box">
+            <label>Izoh / ogohlantirishlar:</label>
+            <textarea id="dayComment" rows="2" placeholder="Masalan: Tog' hududlarida sel xavfi..."></textarea>
+        </div>
+
+        <!-- GENERATSIYA TUGMASI -->
+        <div class="action-bar">
+            <button class="btn btn-primary" id="btnGenerate">🗺️ Prognozni shakllantirish</button>
+        </div>
+    </section>
+
+    <!-- ===== NATIJA PANELI ===== -->
+    <section class="panel hidden" id="resultPanel">
+        <div class="panel-title">
+            <h2>📊 Prognoz natijasi</h2>
+            <div class="panel-controls">
+                <button class="btn btn-outline" id="btnBackToInput">✏️ Tahrirlash</button>
+                <button class="btn btn-outline" id="btnExportPNG">📷 PNG</button>
+                <button class="btn btn-outline" id="btnCopyTelegram">📨 Telegram</button>
+            </div>
+        </div>
+
+        <!-- INTERAKTIV XARITA VA PANEL -->
+        <div class="result-content">
+            <div class="result-left">
+                <!-- KUN TANLASH -->
+                <div class="day-nav" id="resultDayNav">
+                    <button class="day-btn active" data-day="0">I kun</button>
+                    <button class="day-btn" data-day="1">II kun</button>
+                    <button class="day-btn" data-day="2">III kun</button>
+                </div>
+
+                <div class="map-label">Viloyatni bosing — batafsil ma'lumot</div>
+
+                <!-- SVG XARITA -->
+                <div class="map-wrapper" id="mapWrapper">
+                    <svg id="uzmap" viewBox="55 36.5 22 12.5" aria-label="O'zbekiston viloyatlari interaktiv xaritasi">
+                        <defs>
+                            <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+                                <feDropShadow dx="0" dy="0.1" stdDeviation="0.15" flood-color="#000" flood-opacity="0.15"/>
+                            </filter>
+                        </defs>
+                        <rect x="55" y="36.5" width="22" height="12.5" fill="#e8f4fd" rx="0.3"/>
+
+                        <!-- Qoraqalpog'iston -->
+                        <path id="reg-nukus" class="reg-path" data-city="Nukus"
+                            d="M55.5,37.5 L63,37.5 L64,38.5 L64.5,40 L63.5,41.5 L61,42.5 L58,43 L55.5,42 Z"/>
+                        <text class="reg-label" x="58.5" y="40.2">Nukus</text>
+
+                        <!-- Xorazm -->
+                        <path id="reg-urganch" class="reg-path" data-city="Urganch"
+                            d="M58,43 L61,42.5 L61.5,44 L60,44.5 L58.5,44 Z"/>
+                        <text class="reg-label" x="59.2" y="43.6">Urganch</text>
+
+                        <!-- Buxoro -->
+                        <path id="reg-buxoro" class="reg-path" data-city="Buxoro"
+                            d="M61,42.5 L63.5,41.5 L65,43 L65.5,45.5 L63,46.5 L61.5,45 L61.5,44 Z"/>
+                        <text class="reg-label" x="62.8" y="44.2">Buxoro</text>
+
+                        <!-- Navoiy -->
+                        <path id="reg-navoiy" class="reg-path" data-city="Navoiy"
+                            d="M63.5,41.5 L64.5,40 L66,40 L67,41 L67,42.5 L65,43 Z"/>
+                        <text class="reg-label" x="64.8" y="41.8">Navoiy</text>
+
+                        <!-- Samarqand -->
+                        <path id="reg-samarqand" class="reg-path" data-city="Samarqand"
+                            d="M67,41 L68,40 L69,40.5 L69,42 L68,42.5 L67,42.5 Z"/>
+                        <text class="reg-label" x="67.6" y="41.5">Smq</text>
+
+                        <!-- Jizzax -->
+                        <path id="reg-jizzax" class="reg-path" data-city="Jizzax"
+                            d="M68,40 L69.5,39.5 L70,40.5 L69,42 L69,40.5 Z"/>
+                        <text class="reg-label" x="68.7" y="40.6">Jiz</text>
+
+                        <!-- Qashqadaryo (Qarshi) -->
+                        <path id="reg-qarshi" class="reg-path" data-city="Qarshi"
+                            d="M67,42.5 L68,42.5 L69,42 L69.5,44 L68.5,46 L66.5,46.5 L65.5,45.5 L65,43 Z"/>
+                        <text class="reg-label" x="67" y="44.5">Qarshi</text>
+
+                        <!-- Surxondaryo (Termiz) -->
+                        <path id="reg-termiz" class="reg-path" data-city="Termiz"
+                            d="M68.5,46 L69.5,44 L71,44.5 L71,47.5 L69.5,48 Z"/>
+                        <text class="reg-label" x="69.4" y="46.2">Termiz</text>
+
+                        <!-- Toshkent -->
+                        <path id="reg-toshkent" class="reg-path" data-city="Toshkent"
+                            d="M69.5,39.5 L71,39 L72,39.5 L71.5,40.5 L70,40.5 Z"/>
+                        <text class="reg-label" x="70.3" y="39.9">Toshkent</text>
+
+                        <!-- Sirdaryo (Guliston) -->
+                        <path id="reg-guliston" class="reg-path" data-city="Guliston"
+                            d="M71.5,40.5 L72,39.5 L73,40 L72.5,41.5 L71,41 Z"/>
+                        <text class="reg-label" x="71.8" y="40.6">Gul</text>
+
+                        <!-- Namangan -->
+                        <path id="reg-namangan" class="reg-path" data-city="Namangan"
+                            d="M71,39 L72.5,38.5 L74,39 L73.5,40 L73,40 L72,39.5 Z"/>
+                        <text class="reg-label" x="72.2" y="39.2">Namangan</text>
+
+                        <!-- Andijon -->
+                        <path id="reg-andijon" class="reg-path" data-city="Andijon"
+                            d="M73.5,40 L74,39 L75.5,39.5 L76,40.5 L74.5,40.5 Z"/>
+                        <text class="reg-label" x="74.2" y="39.9">And</text>
+
+                        <!-- Farg'ona -->
+                        <path id="reg-fargona" class="reg-path" data-city="Farg'ona"
+                            d="M72.5,41.5 L73,40 L74.5,40.5 L76,40.5 L76,42 L74,42.5 L72.5,42 Z"/>
+                        <text class="reg-label" x="73.8" y="41.5">Farg'ona</text>
+                    </svg>
+                </div>
+
+                <!-- RANG IZOHI -->
+                <div class="map-legend-row">
+                    <span class="legend-item"><span class="legend-swatch" style="background:#85B7EB"></span> &lt;25°C</span>
+                    <span class="legend-item"><span class="legend-swatch" style="background:#A8D8A8"></span> 25–30°C</span>
+                    <span class="legend-item"><span class="legend-swatch" style="background:#FAC775"></span> 30–35°C</span>
+                    <span class="legend-item"><span class="legend-swatch" style="background:#EF9F27"></span> 35–40°C</span>
+                    <span class="legend-item"><span class="legend-swatch" style="background:#E85D5D"></span> 40°C+</span>
                 </div>
             </div>
 
-            <div class="table-container">
-                <table class="data-table" id="dataTable">
-                    <thead>
-                        <tr>
-                            <th>Shahar</th>
-                            <th>T min °C</th>
-                            <th>T max °C</th>
-                            <th>Ob-havo</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody">
-                    </tbody>
-                </table>
-            </div>
+            <!-- O'NG: Tanlangan viloyat ma'lumoti -->
+            <div class="result-right">
+                <div class="region-info" id="regionInfo">
+                    <div class="region-title" id="regionTitle">O'zbekiston — umumiy ko'rinish</div>
+                    <div class="region-sub" id="regionSub">Viloyatni xaritadan tanlang</div>
 
-            <!-- GENERATSIYA TUGMASI -->
-            <div class="action-bar">
-                <button class="btn btn-primary btn-lg" id="btnGenerate">
-                    Xaritani yaratish
-                </button>
-            </div>
-        </div>
-
-        <!-- NATIJA PANELI -->
-        <div class="panel" id="resultPanel" style="display:none;">
-            <div class="panel-title">
-                <h2>Ob-havo xaritasi</h2>
-                <div class="panel-controls">
-                    <button class="btn btn-primary" id="btnDownloadPng">
-                        PNG yuklab olish
-                    </button>
-                    <button class="btn btn-outline" id="btnDownloadSvg">
-                        SVG yuklab olish
-                    </button>
+                    <div class="metrics" id="metricsGrid">
+                        <div class="metric">
+                            <div class="m-label">🌡️ Harorat</div>
+                            <div class="m-val" id="mTemp">—</div>
+                            <div class="m-sub" id="mTempSub">Ma'lumot kiritilmagan</div>
+                        </div>
+                        <div class="metric">
+                            <div class="m-label">💨 Shamol</div>
+                            <div class="m-val" id="mWind">—</div>
+                            <div class="m-sub" id="mWindSub"></div>
+                        </div>
+                        <div class="metric">
+                            <div class="m-label">🌧️ Yog'in</div>
+                            <div class="m-val" id="mRain">—</div>
+                            <div class="m-sub" id="mRainSub"></div>
+                        </div>
+                        <div class="metric">
+                            <div class="m-label">⚠️ Ob-havo</div>
+                            <div class="m-val" id="mWeather">—</div>
+                            <div class="m-sub" id="mWeatherSub"></div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="map-result" id="mapContainer">
-            </div>
-        </div>
-    </main>
 
-    <!-- FOOTER -->
-    <footer class="footer">
-        <div>
-            <strong>Gidrometeorologiya xizmati agentligi</strong>
-            <div class="footer-contact">hydromet.uz</div>
-        </div>
-        <div class="footer-links">
-            <span>Ob-havo prognozi xarita generatori v2.0</span>
-        </div>
-    </footer>
+                <!-- NATIJA JADVALI -->
+                <div class="tbl-wrap">
+                    <div class="tbl-hdr">Barcha shaharlar</div>
+                    <table class="result-tbl">
+                        <thead>
+                            <tr><th>Shahar</th><th>T°C</th><th>Ob-havo</th><th>Shamol</th></tr>
+                        </thead>
+                        <tbody id="resultTableBody"></tbody>
+                    </table>
+                </div>
 
-    <script src="/static/regions.js"></script>
-    <script src="/static/weather-map.js"></script>
-    <script src="/static/app.js"></script>
+                <!-- OGOHLANTIRISHLAR -->
+                <div class="alerts-section" id="alertsSection"></div>
+            </div>
+        </div>
+
+        <!-- TELEGRAM MATN -->
+        <div class="telegram-section" id="telegramSection">
+            <h3>📨 Telegram matn (nusxalash uchun)</h3>
+            <pre id="telegramText"></pre>
+            <button class="btn btn-outline" id="btnCopyTgText">📋 Nusxalash</button>
+        </div>
+    </section>
+
+</main>
+
+<!-- FOOTER -->
+<footer class="footer">
+    <div>
+        <strong>Gidrometeorologiya xizmati agentligi</strong>
+        <div class="footer-contact">📞 1173 | 🌐 hydromet.uz</div>
+    </div>
+    <div class="footer-links">
+        <a href="https://t.me/uzhydromet" target="_blank">📱 Telegram</a>
+        <a href="https://www.instagram.com/uzhydromet" target="_blank">📸 Instagram</a>
+        <a href="https://www.facebook.com/uzhydromet" target="_blank">👍 Facebook</a>
+    </div>
+</footer>
+
+<script src="/static/app.js"></script>
 </body>
 </html>
