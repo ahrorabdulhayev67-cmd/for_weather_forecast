@@ -150,8 +150,12 @@ function renderWeatherMap(weatherData, dateStr, title) {
             fillColor = tempToGradientColor(avgTemp);
         }
         
-        const path = polygonToPath(regionData.polygon);
-        svg += `<path d="${path}" fill="${fillColor}" fill-opacity="0.7" stroke="#37474f" stroke-width="1.8" stroke-linejoin="round"/>`;
+        // Each region can have multiple rings (parts)
+        let pathD = '';
+        for (const ring of regionData.rings) {
+            pathD += ringToPath(ring) + ' ';
+        }
+        svg += `<path d="${pathD.trim()}" fill="${fillColor}" fill-opacity="0.75" stroke="#2c3e50" stroke-width="1.2" stroke-linejoin="round"/>`;
     }
     
     // === SHAHAR BELGILARI + HARORAT + IKONKALAR ===
