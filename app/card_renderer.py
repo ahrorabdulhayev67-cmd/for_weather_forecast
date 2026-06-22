@@ -492,11 +492,11 @@ def render_wind_map(day_data, output_path):
                 "Guliston":"Sirdaryo",
             }
             vname = VILOYAT_NAMES.get(city, city)
-            draw.text((px, py-18), vname, fill="#1A2332", font=get_font(8, True), anchor="mm")
-            # Shamol qiymati
-            if wind:
-                draw.ellipse([(px-25, py-5), (px+25, py+15)], fill="#FFFFFF", outline="#4CAF50")
-                draw.text((px, py+5), f"{wind} m/s", fill="#1B5E20", font=get_font(10, True), anchor="mm")
+            draw.text((px, py-18), vname, fill="#1A2332", font=get_font(10, True), anchor="mm")
+            # Shamol qiymati (0 ham ko'rsatiladi)
+            draw.ellipse([(px-25, py-5), (px+25, py+15)], fill="#FFFFFF", outline="#4CAF50")
+            w_text = f"{wind} m/s" if wind is not None else "0 m/s"
+            draw.text((px, py+5), w_text, fill="#1B5E20", font=get_font(10, True), anchor="mm")
 
     draw.rectangle([(0, H-40), (W, H)], fill="#1B5E20")
     draw.text((W//2, H-22), "O'ZGIDROMET  |  Gidrometeorologiya xizmati agentligi  |  hydromet.uz", fill="#B0C4DE", font=get_font(10), anchor="mm")
@@ -601,7 +601,7 @@ def render_precip_map(day_data, output_path):
                 "Guliston":"Sirdaryo",
             }
             vname = VILOYAT_NAMES.get(city, city)
-            draw.text((px, py-18), vname, fill="#1A2332", font=get_font(8, True), anchor="mm")
+            draw.text((px, py-18), vname, fill="#1A2332", font=get_font(10, True), anchor="mm")
             # Yog'ingarchilik qiymati (0 ham ko'rsatiladi)
             draw.ellipse([(px-22, py-5), (px+22, py+12)], fill="#FFFFFF", outline="#1565C0")
             draw.text((px, py+3), f"{precip} mm", fill="#01579B", font=get_font(10, True), anchor="mm")
