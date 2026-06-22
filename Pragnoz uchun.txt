@@ -1,0 +1,1153 @@
+# -*- coding: utf-8 -*-
+
+import os
+import re
+import numpy as np
+import geopandas as gpd
+import rasterio
+import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
+
+from rasterio.mask import mask
+from rasterio.plot import plotting_extent
+from rasterio.warp import reproject, Resampling
+from PIL import Image
+
+from matplotlib.patches import FancyBboxPatch, Circle, Rectangle
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib.lines import Line2D
+from matplotlib.colors import ListedColormap, BoundaryNorm, LinearSegmentedColormap
+
+
+# =====================================================
+# 1) YO'LLAR
+# =====================================================
+PROVINCE_SHP = r"C:\Users\Jahongir\Desktop\Uzgidromet icon\uzb_admbnda_adm1_2018b_uz\uzb_admbnda_adm1_2018b.shp"
+
+TEMP_TIF = r"C:\Users\Jahongir\Desktop\temperature_uzbekistan.tif"
+ELEVATION_TIF = r"C:\Users\Jahongir\Desktop\uzbekistan_dem.tif"
+HILLSHADE_TIF = r"C:\Users\Jahongir\Desktop\uzbekistan_hillshade.tif"
+
+LOGO = r"C:\Users\Jahongir\Desktop\Uzgidromet icon\Sel suv toshqinlari\O'zgidromet.png"
+
+# Meteocons fill papkasi
+ICON_DIR = r"C:\Users\Jahongir\Desktop\Uzgidromet icon\Meteocons_Downloaded\fill"
+
+# Siz konsolda chiqargan 50 ta SVG icon shu papkadan avtomatik o'qiladi.
+# Muhim: sizda quyidagi fayllar bor: sun.svg, night.svg, cloud.svg, rain.svg,
+# partly-cloudy-day.svg, wind.svg, dust.svg, thermometer-warmer.svg, thermometer-colder.svg va boshqalar.
+ICON_EXTENSIONS = (".svg", ".png", ".jpg", ".jpeg", ".webp", ".ico")
+
+# Ob-havo holatini sizdagi Meteocons fayl nomlari bilan bog'lash.
+# Chap tomondagi kalitlar kod ichida ishlatiladi, o'ng tomoni esa papkadagi fayl nomi.
+WEATHER_ICON_NAME = {
+    "sun": "sun",
+    "night": "night",
+    "cloud": "cloud",
+    "overcast": "overcast",
+    "rain": "rain",
+    "drizzle": "drizzle",
+    "partly": "partly-cloudy-day",
+    "partly-night": "partly-cloudy-night",
+    "snow": "snow",
+    "sleet": "sleet",
+    "hail": "hail",
+    "fog": "fog",
+    "mist": "mist",
+    "haze": "haze",
+    "dust": "dust",
+    "smoke": "smoke",
+    "wind": "wind",
+    "thunder": "thunderstorms",
+    "thunder-rain": "thunderstorms-rain",
+    "thermometer": "thermometer",
+    "thermometer-warmer": "thermometer-warmer",
+    "thermometer-colder": "thermometer-colder",
+    "extreme": "extreme",
+}
+
+# Viloyatlarning alohida ramziy iconlari turadigan papka.
+# Fayllar topilmasa, kod oddiy doira ichida qisqa nom bilan fallback icon chizadi.
+REGION_ICON_DIR = r"C:\Users\Jahongir\Desktop\Uzgidromet icon\Region icons"
+REGION_ICON_FILES = {
+    "Qoraqalpog'iston Respublikasi": "qoraqalpogiston.png",
+    "Xorazm": "xorazm.png",
+    "Buxoro": "buxoro.png",
+    "Navoiy": "navoiy.png",
+    "Toshkent": "toshkent_viloyati.png",
+    "Toshkent sh.": "toshkent_shahri.png",
+    "Toshkent ш.": "toshkent_shahri.png",
+    "Jizzax": "jizzax.png",
+    "Sirdaryo": "sirdaryo.png",
+    "Samarqand": "samarqand.png",
+    "Qashqadaryo": "qashqadaryo.png",
+    "Surxandaryo": "surxondaryo.png",
+    "Surxondaryo": "surxondaryo.png",
+    "Namangan": "namangan.png",
+    "Andijon": "andijon.png",
+    "Farg'ona": "fargona.png",
+}
+
+OUT = r"C:\Users\Jahongir\Desktop\uzgidromet_region_icon_thermometer_FINAL.png"
+
+
+# =====================================================
+# 2) SOZLAMALAR
+# =====================================================
+# Barcha matnlar Cambria shriftida chiqadi.
+# Iconlar SVG/PNG rasm sifatida qo'yiladi, shuning uchun emoji/glyph ogohlantirishlari kamayadi.
+plt.rcParams["font.family"] = "Cambria"
+plt.rcParams["font.serif"] = ["Cambria"]
+plt.rcParams["axes.unicode_minus"] = False
+
+APPLY_ELEVATION_CORRECTION = True
+LAPSE_RATE_C_PER_100M = 0.65
+REFERENCE_ELEVATION_M = 400
+MAX_COOLING_C = 12.0
+
+
+# =====================================================
+# 3) MA'LUMOTLAR
+# =====================================================
+weather = {
+    "Qoraqalpog'iston Respublikasi": {
+        "name": "Qoraqalpog'iston\nResp.",
+        "day": "34...36°C",
+        "night": "22...24°C",
+        "rain": "0–1 mm",
+        "wind": "7–12 m/s",
+        "kind": "sun"
+    },
+    "Xorazm": {
+        "name": "Xorazm",
+        "day": "37...39°C",
+        "night": "23...25°C",
+        "rain": "0–1 mm",
+        "wind": "7–12 m/s",
+        "kind": "sun"
+    },
+    "Buxoro": {
+        "name": "Buxoro",
+        "day": "37...39°C",
+        "night": "24...26°C",
+        "rain": "0–1 mm",
+        "wind": "7–13 m/s",
+        "kind": "sun"
+    },
+    "Navoiy": {
+        "name": "Navoiy",
+        "day": "36...38°C",
+        "night": "22...24°C",
+        "rain": "0–1 mm",
+        "wind": "7–12 m/s",
+        "kind": "partly"
+    },
+    "Toshkent": {
+        "name": "Toshkent\nviloyati",
+        "day": "33...35°C",
+        "night": "21...23°C",
+        "rain": "1–3 mm",
+        "wind": "5–10 m/s",
+        "kind": "rain"
+    },
+    "Toshkent sh.": {
+        "name": "Toshkent",
+        "day": "34...36°C",
+        "night": "22...24°C",
+        "rain": "0–1 mm",
+        "wind": "5–10 m/s",
+        "kind": "partly"
+    },
+    "Jizzax": {
+        "name": "Jizzax",
+        "day": "35...37°C",
+        "night": "22...24°C",
+        "rain": "0–1 mm",
+        "wind": "7–12 m/s",
+        "kind": "sun"
+    },
+    "Sirdaryo": {
+        "name": "Sirdaryo",
+        "day": "35...37°C",
+        "night": "22...24°C",
+        "rain": "0–1 mm",
+        "wind": "7–12 m/s",
+        "kind": "sun"
+    },
+    "Samarqand": {
+        "name": "Samarqand",
+        "day": "36...38°C",
+        "night": "21...23°C",
+        "rain": "0–1 mm",
+        "wind": "7–12 m/s",
+        "kind": "sun"
+    },
+    "Qashqadaryo": {
+        "name": "Qashqadaryo",
+        "day": "38...40°C",
+        "night": "23...25°C",
+        "rain": "0–2 mm",
+        "wind": "7–13 m/s",
+        "kind": "sun"
+    },
+    "Surxandaryo": {
+        "name": "Surxondaryo",
+        "day": "39...42°C",
+        "night": "24...26°C",
+        "rain": "0–2 mm",
+        "wind": "7–15 m/s",
+        "kind": "sun"
+    },
+    "Namangan": {
+        "name": "Namangan",
+        "day": "33...35°C",
+        "night": "21...23°C",
+        "rain": "1–3 mm",
+        "wind": "5–10 m/s",
+        "kind": "rain"
+    },
+    "Andijon": {
+        "name": "Andijon",
+        "day": "34...36°C",
+        "night": "21...23°C",
+        "rain": "1–2 mm",
+        "wind": "5–10 m/s",
+        "kind": "rain"
+    },
+    "Farg'ona": {
+        "name": "Farg'ona",
+        "day": "34...36°C",
+        "night": "21...23°C",
+        "rain": "1–2 mm",
+        "wind": "5–10 m/s",
+        "kind": "rain"
+    },
+}
+
+# SHP faylingizdagi Toshkent shahri yozilishi ruscha "ш." bo'lsa ham moslab beradi.
+weather_aliases = {
+    "Toshkent ш.": weather["Toshkent sh."],
+}
+
+
+def temp_mid(text):
+    nums = re.findall(r"\d+(?:\.\d+)?", str(text))
+    if len(nums) >= 2:
+        return (float(nums[0]) + float(nums[1])) / 2.0
+    if len(nums) == 1:
+        return float(nums[0])
+    return np.nan
+
+
+# =====================================================
+# 4) HARORAT RANGLARI — 2°C ORALIQDA KO'KDAN QIZILGA
+# =====================================================
+# Legend 10, 12, 14 ... 46°C ko'rinishida bo'ladi.
+temp_levels = list(range(10, 48, 2))
+
+# Ko'k → moviy → yashil → sariq → to'q sariq → qizil gradient.
+gradient_cmap = LinearSegmentedColormap.from_list(
+    "uz_temp_blue_to_red",
+    [
+        "#1565C0",
+        "#29B6F6",
+        "#66BB6A",
+        "#FFF176",
+        "#FF9800",
+        "#E53935",
+        "#B71C1C",
+    ],
+    N=len(temp_levels) - 1
+)
+
+temp_colors = [gradient_cmap(i / (len(temp_levels) - 2)) for i in range(len(temp_levels) - 1)]
+cmap = ListedColormap(temp_colors)
+norm = BoundaryNorm(temp_levels, cmap.N, clip=True)
+
+
+def temp_to_color(value):
+    if np.isnan(value):
+        return "#EEEEEE"
+    idx = np.digitize([value], temp_levels)[0] - 1
+    idx = int(np.clip(idx, 0, len(temp_colors) - 1))
+    return temp_colors[idx]
+
+
+def wind_max(text):
+    nums = re.findall(r"\d+(?:\.\d+)?", str(text))
+    if not nums:
+        return 0.0
+    return max(float(x) for x in nums)
+
+
+def wind_zoom(text, base=0.040):
+    """Shamol tezligiga qarab ikon o'lchamini beradi."""
+    w = wind_max(text)
+    if w <= 8:
+        return base * 0.85
+    if w <= 12:
+        return base * 1.05
+    if w <= 15:
+        return base * 1.25
+    return base * 1.45
+
+
+# =====================================================
+# 5) SVG/PNG ICON
+# =====================================================
+def load_all_icons(icon_dir):
+    """ICON_DIR ichidagi barcha icon fayllarni nomi bo'yicha lug'atga yig'adi."""
+    icons = {}
+    if not os.path.isdir(icon_dir):
+        print("DIQQAT: ICON_DIR topilmadi:", icon_dir)
+        return icons
+
+    for root, _, files in os.walk(icon_dir):
+        for fname in files:
+            stem, ext = os.path.splitext(fname)
+            if ext.lower() in ICON_EXTENSIONS:
+                icons[stem] = os.path.join(root, fname)
+
+    print(f"Meteocons: {len(icons)} ta icon o'qildi.")
+    if icons:
+        print("Icon nomlari:", ", ".join(sorted(icons.keys())))
+    return icons
+
+
+ALL_ICONS = load_all_icons(ICON_DIR)
+
+
+def get_icon_path(kind):
+    """Koddagi kind nomini haqiqiy fayl yo'liga aylantiradi."""
+    # Shamol iconi aynan shu papkadan olinadi:
+    # C:\Users\Jahongir\Desktop\Uzgidromet icon\Meteocons_Downloaded\fill\wind.svg
+    if kind == "wind":
+        wind_path = os.path.join(ICON_DIR, "wind.svg")
+        if os.path.exists(wind_path):
+            return wind_path
+
+    icon_name = WEATHER_ICON_NAME.get(kind, kind)
+
+    # 1) Avval avtomatik o'qilgan iconlardan izlaydi
+    if icon_name in ALL_ICONS:
+        return ALL_ICONS[icon_name]
+
+    # 2) Agar kind bevosita fayl nomi bo'lsa, uni ham tekshiradi
+    if kind in ALL_ICONS:
+        return ALL_ICONS[kind]
+
+    # 3) Fallback: cloud yoki mavjud birinchi icon
+    if "cloud" in ALL_ICONS:
+        return ALL_ICONS["cloud"]
+    return next(iter(ALL_ICONS.values()), "")
+
+
+def icon_to_png_array(path):
+    """
+    PNG bo'lsa to'g'ridan-to'g'ri o'qiydi.
+    SVG bo'lsa cairosvg orqali PNG ga aylantiradi.
+    Agar cairosvg o'rnatilmagan bo'lsa, False qaytaradi.
+    """
+    ext = os.path.splitext(path)[1].lower()
+
+    if ext in [".png", ".jpg", ".jpeg", ".webp"]:
+        return np.asarray(Image.open(path).convert("RGBA"))
+
+    if ext == ".svg":
+        try:
+            import cairosvg
+            import io
+            png_bytes = cairosvg.svg2png(url=path, output_width=256, output_height=256)
+            return np.asarray(Image.open(io.BytesIO(png_bytes)).convert("RGBA"))
+        except Exception:
+            return None
+
+    return None
+
+
+def put_file_icon(ax, kind, x, y, zoom=0.10, xycoords="axes fraction", z=50):
+    path = get_icon_path(kind)
+
+    if not os.path.exists(path):
+        return False
+
+    arr = icon_to_png_array(path)
+    if arr is None:
+        return False
+
+    imagebox = OffsetImage(arr, zoom=zoom)
+
+    ab = AnnotationBbox(
+        imagebox,
+        (x, y),
+        xycoords=xycoords,
+        frameon=False,
+        pad=0,
+        zorder=z
+    )
+
+    ax.add_artist(ab)
+    return True
+
+
+def get_region_icon_path(adm1_name):
+    fname = REGION_ICON_FILES.get(adm1_name)
+    if not fname:
+        return None
+    path = os.path.join(REGION_ICON_DIR, fname)
+    return path if os.path.exists(path) else None
+
+
+def region_short_code(adm1_name):
+    label = clean_region_label(adm1_name) if "clean_region_label" in globals() else str(adm1_name)
+    if "Qoraqal" in label:
+        return "QR"
+    if "Toshkent sh" in label:
+        return "TSH"
+    if "Toshkent" in label:
+        return "TV"
+    return label[:2].upper()
+
+
+def put_region_icon_axes(ax, adm1_name, x, y, zoom=0.055, z=50):
+    """Kartochka ichiga viloyat ramziy iconini qo'yadi."""
+    path = get_region_icon_path(adm1_name)
+    if path:
+        arr = icon_to_png_array(path)
+        if arr is not None:
+            ax.add_artist(AnnotationBbox(OffsetImage(arr, zoom=zoom), (x, y),
+                                         xycoords="axes fraction", frameon=False, pad=0, zorder=z))
+            return True
+
+    # Fallback: icon fayl topilmasa doira ichida qisqa belgi chiziladi.
+    ax.add_patch(Circle((x, y), 0.045, transform=ax.transAxes,
+                        facecolor="#EAF4FF", edgecolor="#0B4EA2", linewidth=1.0, zorder=z))
+    ax.text(x, y, region_short_code(adm1_name), transform=ax.transAxes,
+            ha="center", va="center", fontsize=5.8, color="#0B4EA2",
+            fontweight="bold", zorder=z+1)
+    return False
+
+
+def put_region_icon_data(ax, adm1_name, x, y, zoom=0.017, z=60):
+    """Xarita ichiga viloyat ramziy iconini data koordinatada qo'yadi."""
+    path = get_region_icon_path(adm1_name)
+    if path:
+        arr = icon_to_png_array(path)
+        if arr is not None:
+            ax.add_artist(AnnotationBbox(OffsetImage(arr, zoom=zoom), (x, y),
+                                         xycoords="data", frameon=False, pad=0, zorder=z))
+            return True
+    return False
+
+
+# =====================================================
+# 6) ICON TOPILMASA CHIZILADIGAN ICONLAR
+# =====================================================
+def draw_sun(ax, x, y, s=1, transform=None, z=20):
+    tr = transform or ax.transAxes
+    r = 0.018 * s
+
+    for a in np.linspace(0, 2 * np.pi, 12, endpoint=False):
+        ax.add_line(Line2D(
+            [x + np.cos(a) * r * 1.4, x + np.cos(a) * r * 2.0],
+            [y + np.sin(a) * r * 1.4, y + np.sin(a) * r * 2.0],
+            transform=tr,
+            color="#FFC400",
+            linewidth=1.5,
+            zorder=z
+        ))
+
+    ax.add_patch(Circle(
+        (x, y), r,
+        transform=tr,
+        facecolor="#FFD12A",
+        edgecolor="#FF9900",
+        linewidth=0.8,
+        zorder=z + 1
+    ))
+
+
+def draw_cloud(ax, x, y, s=1, transform=None, z=20):
+    tr = transform or ax.transAxes
+    r = 0.020 * s
+
+    ax.add_patch(Circle((x - r * 0.8, y), r * 0.75, transform=tr,
+                        facecolor="#9FB3C7", edgecolor="none", zorder=z))
+    ax.add_patch(Circle((x, y + r * 0.35), r, transform=tr,
+                        facecolor="#BFD0DF", edgecolor="none", zorder=z + 1))
+    ax.add_patch(Circle((x + r * 0.9, y), r * 0.75, transform=tr,
+                        facecolor="#9FB3C7", edgecolor="none", zorder=z))
+    ax.add_patch(Rectangle((x - r * 1.45, y - r * 0.50), r * 2.9, r * 0.9,
+                           transform=tr, facecolor="#BFD0DF",
+                           edgecolor="none", zorder=z + 2))
+
+
+def draw_rain(ax, x, y, s=1, transform=None, z=20):
+    tr = transform or ax.transAxes
+    r = 0.020 * s
+    draw_cloud(ax, x, y, s=s, transform=tr, z=z)
+
+    for dx in [-0.012 * s, 0.0, 0.012 * s]:
+        ax.add_line(Line2D(
+            [x + dx, x + dx - 0.004 * s],
+            [y - r * 1.1, y - r * 1.8],
+            transform=tr,
+            color="#1EA7FF",
+            linewidth=1.5,
+            zorder=z + 5
+        ))
+
+
+def draw_partly(ax, x, y, s=1, transform=None, z=20):
+    draw_sun(ax, x - 0.012 * s, y + 0.006 * s, s=s * 0.75, transform=transform, z=z)
+    draw_cloud(ax, x + 0.006 * s, y - 0.004 * s, s=s * 0.85, transform=transform, z=z + 3)
+
+
+def draw_wind_icon(ax, x, y, s=1, transform=None, z=20, color="#1E88E5"):
+    tr = transform or ax.transAxes
+    for yy, ln in [(0.010, 0.035), (0.000, 0.045), (-0.010, 0.030)]:
+        ax.add_line(Line2D(
+            [x - ln * s, x + ln * s],
+            [y + yy * s, y + yy * s],
+            transform=tr,
+            color=color,
+            linewidth=1.2,
+            solid_capstyle="round",
+            zorder=z
+        ))
+
+
+def put_icon(ax, kind, x, y, s=1, transform=None, z=20):
+    """
+    Iconni faqat Meteocons_Downloaded\fill papkasidan rasm sifatida qo'yadi.
+    Cambria glyph warning chiqmasligi uchun Unicode fallback belgilar ishlatilmaydi.
+    """
+    put_file_icon(
+        ax,
+        kind,
+        x,
+        y,
+        zoom=0.08 * s,
+        xycoords="axes fraction",
+        z=z + 10
+    )
+    return
+
+
+# =====================================================
+# 7) RASTER FUNKSIYALARI
+# =====================================================
+def read_masked_raster(tif_path, mask_gdf):
+    if not tif_path or not os.path.exists(tif_path):
+        return None, None, None, None
+
+    with rasterio.open(tif_path) as src:
+        shp = mask_gdf.to_crs(src.crs)
+        geoms = [g for g in shp.geometry if g is not None]
+
+        out_img, out_transform = mask(src, geoms, crop=True, filled=True)
+        arr = out_img[0].astype(float)
+
+        nodata = src.nodata
+        if nodata is not None:
+            arr[arr == nodata] = np.nan
+
+        arr[np.isinf(arr)] = np.nan
+
+        extent = plotting_extent(arr, out_transform)
+
+        meta = {
+            "crs": src.crs,
+            "transform": out_transform,
+            "height": arr.shape[0],
+            "width": arr.shape[1],
+        }
+
+        return arr, extent, src.crs, meta
+
+
+def reproject_to_match(src_tif, target_meta, mask_gdf):
+    if not src_tif or not os.path.exists(src_tif):
+        return None
+
+    with rasterio.open(src_tif) as src:
+        shp = mask_gdf.to_crs(src.crs)
+        geoms = [g for g in shp.geometry if g is not None]
+
+        out_img, out_transform = mask(src, geoms, crop=True, filled=True)
+        src_arr = out_img[0].astype(float)
+
+        if src.nodata is not None:
+            src_arr[src_arr == src.nodata] = np.nan
+
+        dst = np.full(
+            (target_meta["height"], target_meta["width"]),
+            np.nan,
+            dtype="float32"
+        )
+
+        reproject(
+            source=src_arr,
+            destination=dst,
+            src_transform=out_transform,
+            src_crs=src.crs,
+            dst_transform=target_meta["transform"],
+            dst_crs=target_meta["crs"],
+            resampling=Resampling.bilinear,
+            src_nodata=np.nan,
+            dst_nodata=np.nan
+        )
+
+        return dst
+
+
+def apply_elevation_correction(temp_arr, elev_arr):
+    if temp_arr is None or elev_arr is None:
+        return temp_arr
+
+    elev_excess = np.maximum(elev_arr - REFERENCE_ELEVATION_M, 0)
+    cooling = (elev_excess / 100.0) * LAPSE_RATE_C_PER_100M
+    cooling = np.clip(cooling, 0, MAX_COOLING_C)
+
+    corrected = temp_arr - cooling
+    corrected[np.isnan(temp_arr)] = np.nan
+
+    return corrected
+
+
+
+# =====================================================
+# 7.1) XARITA YOZUVLARI: VILOYAT NOMI VA SILJITISHLAR
+# =====================================================
+# SHP ichidagi ayrim nomlarni chiroyli ko'rinishga keltirish.
+region_label_names = {
+    "Qoraqalpog'iston Respublikasi": "Qoraqalpog'iston",
+    "Toshkent ш.": "Toshkent sh.",
+    "Toshkent sh.": "Toshkent sh.",
+    "Surxandaryo": "Surxondaryo",
+}
+
+# SHP nomi bilan weather lug'ati nomi mos kelmasa shu yerda moslaymiz.
+weather_key_alias = {
+    "Toshkent ш.": "Toshkent sh.",
+    "Toshkent sh.": "Toshkent sh.",
+    "Surxondaryo": "Surxandaryo",
+}
+
+# Viloyat nomi + harorat + shamol yozuvlarini siljitish.
+# Ikkinchi qiymat Y bo'yicha: katta musbat son - yuqoriga ko'taradi.
+label_offsets_temp = {
+    "Qoraqalpog'iston Respublikasi": (0, 60000),
+    "Xorazm": (-20000, 20000),
+    "Buxoro": (0, 55000),
+    "Navoiy": (0, 55000),
+    "Samarqand": (0, 50000),
+    "Jizzax": (0, 52000),
+    "Sirdaryo": (95000, -20000),
+    "Toshkent": (-90000, 115000),
+    "Toshkent ш.": (175000, 20000),
+    "Toshkent sh.": (175000, 20000),
+    "Qashqadaryo": (0, 52000),
+    "Surxandaryo": (0, 52000),
+    "Surxondaryo": (0, 52000),
+    "Andijon": (125000, 5000),
+    "Namangan": (85000, 95000),
+    "Farg'ona": (105000, -45000),
+}
+
+label_offsets_wind = {
+    "Qoraqalpog'iston Respublikasi": (0, 60000),
+    "Xorazm": (-20000, 20000),
+    "Buxoro": (0, 55000),
+    "Navoiy": (0, 55000),
+    "Samarqand": (0, 50000),
+    "Jizzax": (0, 52000),
+    "Sirdaryo": (95000, -20000),
+    "Toshkent": (-90000, 115000),
+    "Toshkent ш.": (175000, 20000),
+    "Toshkent sh.": (175000, 20000),
+    "Qashqadaryo": (0, 52000),
+    "Surxandaryo": (0, 52000),
+    "Surxondaryo": (0, 52000),
+    "Andijon": (125000, 5000),
+    "Namangan": (85000, 95000),
+    "Farg'ona": (105000, -45000),
+}
+
+
+def clean_region_label(adm1_name):
+    """Xaritada chiqadigan viloyat nomini qaytaradi."""
+    return region_label_names.get(adm1_name, adm1_name)
+
+
+def clean_range_text(text):
+    """
+    Haroratni ikki tomoni uch nuqta bilan chiqishi uchun:
+    34–36°C yoki 34-36°C -> 34...36°C
+    """
+    return str(text).replace("–", "...").replace("-", "...")
+
+# =====================================================
+# 8) SHP VA TIF O'QISH
+# =====================================================
+if not os.path.exists(PROVINCE_SHP):
+    raise FileNotFoundError(f"SHP topilmadi: {PROVINCE_SHP}")
+
+gdf = gpd.read_file(PROVINCE_SHP)
+gdf["weather_key"] = gdf["ADM1_UZ"].apply(lambda n: weather_key_alias.get(n, n))
+gdf["info"] = gdf["weather_key"].map(weather)
+gdf.loc[gdf["info"].isna(), "info"] = gdf.loc[gdf["info"].isna(), "ADM1_UZ"].map(weather_aliases)
+
+gdf["map_temp"] = gdf["info"].apply(
+    lambda d: temp_mid(d["day"]) if isinstance(d, dict) else np.nan
+)
+gdf["fill_color"] = gdf["map_temp"].apply(temp_to_color)
+
+uzb_mask = gdf.dissolve()
+
+temp_arr, temp_extent, temp_crs, temp_meta = read_masked_raster(TEMP_TIF, uzb_mask)
+hill_arr, hill_extent, hill_crs, hill_meta = read_masked_raster(HILLSHADE_TIF, uzb_mask)
+
+if temp_arr is not None and temp_meta is not None and APPLY_ELEVATION_CORRECTION:
+    elev_arr = reproject_to_match(ELEVATION_TIF, temp_meta, uzb_mask)
+    temp_arr = apply_elevation_correction(temp_arr, elev_arr)
+    print("DEM asosida tog'li hududlarda harorat pasaytirildi.")
+else:
+    print("TEMP_TIF yoki DEM topilmadi. Raster tuzatilmadi.")
+
+if temp_crs is not None:
+    map_crs = temp_crs
+elif hill_crs is not None:
+    map_crs = hill_crs
+else:
+    map_crs = "EPSG:3857"
+
+gdf_map = gdf.to_crs(map_crs)
+gdf_map["point"] = gdf_map.geometry.representative_point()
+minx, miny, maxx, maxy = gdf_map.total_bounds
+
+
+# =====================================================
+# 9) FIGURE
+# =====================================================
+fig = plt.figure(figsize=(16, 9), dpi=250)
+fig.patch.set_facecolor("#EAF4FF")
+
+bg = fig.add_axes([0, 0, 1, 1])
+bg.axis("off")
+bg.add_patch(Rectangle((0, 0), 1, 1, transform=bg.transAxes,
+                       facecolor="#EAF4FF", edgecolor="none"))
+
+left_panel = FancyBboxPatch(
+    (0.012, 0.025), 0.475, 0.95,
+    boxstyle="round,pad=0.008,rounding_size=0.025",
+    transform=fig.transFigure,
+    facecolor="#F7FBFF",
+    edgecolor="#0B4EA2",
+    linewidth=2.5,
+    zorder=1
+)
+fig.patches.append(left_panel)
+
+right_panel = FancyBboxPatch(
+    (0.513, 0.025), 0.475, 0.95,
+    boxstyle="round,pad=0.008,rounding_size=0.025",
+    transform=fig.transFigure,
+    facecolor="#F7FBFF",
+    edgecolor="#0B4EA2",
+    linewidth=2.5,
+    zorder=1
+)
+fig.patches.append(right_panel)
+
+
+# =====================================================
+# 10) HEADER
+# =====================================================
+def add_header(x0):
+    if os.path.exists(LOGO):
+        ax_logo = fig.add_axes([x0 + 0.020, 0.895, 0.055, 0.075], zorder=10)
+        ax_logo.imshow(Image.open(LOGO).convert("RGBA"))
+        ax_logo.axis("off")
+
+    fig.text(x0 + 0.085, 0.938, "O‘ZGIDROMET",
+             fontsize=19, fontweight="bold", color="#0B4EA2",
+             ha="left", va="center", zorder=10)
+
+    fig.text(x0 + 0.085, 0.912, "O‘ZBEKISTON GIDROMETEOROLOGIYA XIZMATI",
+             fontsize=8.5, fontweight="bold", color="#17406E",
+             ha="left", va="center", zorder=10)
+
+    fig.text(x0 + 0.400, 0.940, "17-IYUN",
+             fontsize=11, fontweight="bold", color="#0B4EA2",
+             ha="center", va="center", zorder=10)
+
+    fig.text(x0 + 0.400, 0.915, "2025-yil, seshanba",
+             fontsize=8, color="#17406E",
+             ha="center", va="center", zorder=10)
+
+
+add_header(0.012)
+add_header(0.513)
+
+
+# =====================================================
+# 11) CHAP PANEL — XARITA
+# =====================================================
+fig.text(0.035, 0.855, "HARORAT XARITASI",
+         fontsize=22, fontweight="bold", color="#0B3D91", ha="left")
+
+fig.text(0.035, 0.825, "O‘ZBEKISTON BO‘YICHA",
+         fontsize=14, fontweight="bold", color="#0B3D91", ha="left")
+
+fig.text(0.035, 0.795, "Ertangi kun uchun prognoz",
+         fontsize=10, color="#17406E", ha="left")
+
+ax_map = fig.add_axes([0.035, 0.300, 0.420, 0.470], zorder=5)
+ax_map.axis("off")
+
+if hill_arr is not None:
+    ax_map.imshow(
+        hill_arr,
+        extent=hill_extent,
+        cmap="Greys",
+        alpha=0.38,
+        zorder=1
+    )
+else:
+    ax_map.set_facecolor("#EEF6FF")
+
+if temp_arr is not None:
+    ax_map.imshow(
+        temp_arr,
+        extent=temp_extent,
+        cmap=cmap,
+        norm=norm,
+        alpha=0.94,
+        zorder=3
+    )
+    gdf_map.boundary.plot(ax=ax_map, color="white", linewidth=1.0, zorder=4)
+    gdf_map.boundary.plot(ax=ax_map, color="#ECA64A", linewidth=0.25, zorder=5)
+else:
+    gdf_map.plot(
+        ax=ax_map,
+        color=gdf_map["fill_color"],
+        edgecolor="white",
+        linewidth=1.0,
+        zorder=3
+    )
+    gdf_map.boundary.plot(ax=ax_map, color="#ECA64A", linewidth=0.35, zorder=5)
+
+# =====================================================
+# XARITADA: VILOYAT NOMI + KUNDUZI/TUNI/SHAMOL
+# Muhim: oq/shaffof fon olib tashlandi.
+# Har bir qator alohida joylashadi, shuning uchun yozuvlar bir-birining ustiga chiqmaydi.
+# =====================================================
+def put_map_icon(ax, kind, x, y, zoom=0.030, z=50):
+    """
+    Xarita ichiga data koordinatada icon qo'yadi.
+    Iconlar faqat Meteocons_Downloaded\fill papkasidan olinadi.
+    Unicode fallback ishlatilmaydi, shuning uchun Cambria glyph warning chiqmaydi.
+    """
+    path = get_icon_path(kind)
+    if os.path.exists(path):
+        arr = icon_to_png_array(path)
+        if arr is not None:
+            imagebox = OffsetImage(arr, zoom=zoom)
+            ab = AnnotationBbox(
+                imagebox,
+                (x, y),
+                xycoords="data",
+                frameon=False,
+                pad=0,
+                zorder=z
+            )
+            ax.add_artist(ab)
+            return True
+
+    return False
+
+
+def map_text(ax, x, y, text, color="black", fontsize=5.6, weight="normal", ha="left", z=60):
+    """Xaritadagi barcha yozuvlarni qora rangda chiqaradi."""
+    ax.text(
+        x, y, text,
+        ha=ha, va="center",
+        fontsize=fontsize,
+        color="black",
+        fontweight=weight,
+        zorder=z
+    )
+
+
+for _, row in gdf_map.iterrows():
+    info = row["info"]
+    if not isinstance(info, dict):
+        continue
+
+    adm1_name = row["ADM1_UZ"]
+    x0, y0 = row["point"].x, row["point"].y
+
+    # Siz bergan siljitishlar bo'yicha joylashtirish.
+    dx_t, dy_t = label_offsets_temp.get(adm1_name, (0, 45000))
+    x = x0 + dx_t
+    y = y0 + dy_t
+
+    region_name = clean_region_label(adm1_name)
+    day_text = clean_range_text(info["day"])
+    night_text = clean_range_text(info["night"])
+    wind_text = clean_range_text(info["wind"])
+
+    # O'lchamlar xarita masshtabiga bog'langan.
+    H = (maxy - miny)
+    W = (maxx - minx)
+
+    # Qatorlar orasini kattaroq qildik: ustma-ust tushmaydi.
+    title_y = y + H * 0.052
+    row1_y = y + H * 0.024   # kunduzi
+    row2_y = y + H * 0.000   # kechasi
+    row3_y = y - H * 0.024   # shamol
+
+    icon_x = x - W * 0.024
+    text_x = x - W * 0.008
+
+    # 1) Viloyat ramziy iconi + nomi
+    # Icon fayl topilmasa xaritada qo'shimcha fallback chizilmaydi, nomning o'zi qoladi.
+    put_region_icon_data(ax_map, adm1_name, x - W * 0.033, title_y, zoom=0.014, z=64)
+    map_text(
+        ax_map, x, title_y, region_name,
+        color="#0B3D91",
+        fontsize=5.8,
+        weight="bold",
+        ha="center",
+        z=65
+    )
+
+    # 2) Kunduzi harorat — qizil/orange
+    put_map_icon(ax_map, "sun", icon_x, row1_y, zoom=0.016, z=62)
+    map_text(
+        ax_map, text_x, row1_y, day_text,
+        color="#E53935",
+        fontsize=5.0,
+        weight="normal",
+        ha="left",
+        z=66
+    )
+
+    # 3) Kechasi harorat — ko'k
+    put_map_icon(ax_map, "night", icon_x, row2_y, zoom=0.016, z=62)
+    map_text(
+        ax_map, text_x, row2_y, night_text,
+        color="#1565C0",
+        fontsize=5.1,
+        weight="normal",
+        ha="left",
+        z=66
+    )
+
+    # 4) Shamol — ko'k-yashil
+    put_map_icon(ax_map, "wind", icon_x, row3_y, zoom=0.016, z=62)
+    map_text(
+        ax_map, text_x, row3_y, wind_text,
+        color="#0077B6",
+        fontsize=5.0,
+        weight="normal",
+        ha="left",
+        z=66
+    )
+
+padx = (maxx - minx) * 0.07
+pady = (maxy - miny) * 0.10
+ax_map.set_xlim(minx - padx, maxx + padx)
+ax_map.set_ylim(miny - pady, maxy + pady)
+
+
+# =====================================================
+# 12) COLORBAR
+# =====================================================
+cbox = fig.add_axes([0.248, 0.735, 0.220, 0.075], zorder=30)
+cbox.axis("off")
+cbox.add_patch(FancyBboxPatch(
+    (0, 0), 1, 1,
+    transform=cbox.transAxes,
+    boxstyle="round,pad=0.02,rounding_size=0.08",
+    facecolor="white",
+    edgecolor="#D7E3F0",
+    alpha=0.88
+))
+
+cax = fig.add_axes([0.265, 0.768, 0.185, 0.013], zorder=40)
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+sm.set_array([])
+cbar = fig.colorbar(
+    sm,
+    cax=cax,
+    orientation="horizontal",
+    boundaries=temp_levels,
+    ticks=temp_levels,
+    spacing="proportional",
+    extend="both"   # legendaning ikki uchi uchburchak bo'ladi
+)
+cbar.outline.set_visible(False)
+cbar.ax.tick_params(labelsize=4.0, pad=1)
+cbox.text(0.50, 0.70, "Kunduzgi harorat, °C  |  2°C oraliq",
+          ha="center", va="center", fontsize=6.7,
+          color="#20334D", fontweight="bold")
+
+
+# =====================================================
+# 13) PASTKI INFO BLOK
+# =====================================================
+info_ax = fig.add_axes([0.045, 0.095, 0.285, 0.160], zorder=20)
+info_ax.axis("off")
+info_ax.add_patch(FancyBboxPatch(
+    (0, 0), 1, 1,
+    transform=info_ax.transAxes,
+    boxstyle="round,pad=0.02,rounding_size=0.035",
+    facecolor="white",
+    edgecolor="#D7E3F0",
+    alpha=0.90
+))
+
+# Eng issiq/eng salqin bloklariga termometr iconi qo'yildi.
+put_file_icon(info_ax, "thermometer-warmer", 0.075, 0.47, zoom=0.070, xycoords="axes fraction", z=30)
+info_ax.text(0.16, 0.72, "ENG ISSIQ HUDUD", fontsize=9,
+             color="#0B3D91", fontweight="bold")
+info_ax.text(0.16, 0.55, "Surxondaryo viloyati", fontsize=8,
+             color="#17406E")
+info_ax.text(0.16, 0.33, "+42°C", fontsize=18,
+             color="#E53935", fontweight="bold")
+
+put_file_icon(info_ax, "thermometer-colder", 0.535, 0.47, zoom=0.070, xycoords="axes fraction", z=30)
+info_ax.text(0.62, 0.72, "ENG SALQIN HUDUD", fontsize=9,
+             color="#0B3D91", fontweight="bold")
+info_ax.text(0.62, 0.55, "Toshkent vil. tog‘li hududlari", fontsize=8,
+             color="#17406E")
+info_ax.text(0.62, 0.33, "+18°C", fontsize=18,
+             color="#1E88E5", fontweight="bold")
+
+
+# =====================================================
+# 14) O'NG PANEL — KARTALAR
+# =====================================================
+fig.text(0.535, 0.860, "VILOYATLAR BO‘YICHA KUNDUZ/TUN/SHAMOL PROGNOZI",
+         fontsize=18, fontweight="bold", color="#0B3D91", ha="left")
+
+fig.text(0.535, 0.832, "Ertangi kun uchun",
+         fontsize=10, color="#17406E", ha="left")
+
+
+def draw_card(fig, x, y, w, h, adm1_name, data):
+    ax = fig.add_axes([x, y, w, h], zorder=20)
+    ax.axis("off")
+
+    ax.add_patch(FancyBboxPatch(
+        (0, 0), 1, 1,
+        transform=ax.transAxes,
+        boxstyle="round,pad=0.02,rounding_size=0.06",
+        facecolor="white",
+        edgecolor="#D7E3F0",
+        linewidth=1.0,
+        alpha=0.95
+    ))
+
+    ax.text(0.08, 0.84, data["name"].upper(),
+            transform=ax.transAxes,
+            fontsize=8.7,
+            fontweight="bold",
+            color="#0B3D91",
+            ha="left", va="top")
+
+    # Viloyat ramzi iconi: har bir viloyat uchun alohida icon.
+    # REGION_ICON_DIR papkasidagi fayl topilmasa doira ichida qisqa belgi chiqadi.
+    put_region_icon_axes(ax, adm1_name, 0.82, 0.70, zoom=0.050, z=35)
+
+    # Ob-havo holati iconi alohida kichikroq joyda.
+    put_icon(ax, data["kind"], 0.83, 0.47, s=0.75, transform=ax.transAxes, z=25)
+
+    # 3 ta asosiy ma'lumot: kunduzi, tuni, shamol.
+    # Har biri alohida qatorda, icon + matn tarzida, ustma-ust tushmaydi.
+    put_icon(ax, "sun", 0.095, 0.37, s=0.42, transform=ax.transAxes, z=30)
+    ax.text(0.20, 0.37, data["day"], transform=ax.transAxes,
+            fontsize=10.0, color="#E53935", fontweight="bold",
+            ha="left", va="center")
+
+    put_icon(ax, "night", 0.095, 0.235, s=0.42, transform=ax.transAxes, z=30)
+    ax.text(0.20, 0.235, data["night"], transform=ax.transAxes,
+            fontsize=9.4, color="#1565C0", fontweight="bold",
+            ha="left", va="center")
+
+    put_icon(ax, "wind", 0.095, 0.105, s=0.42, transform=ax.transAxes, z=30)
+    ax.text(0.20, 0.105, data["wind"], transform=ax.transAxes,
+            fontsize=8.9, color="#0077B6", fontweight="bold",
+            ha="left", va="center")
+
+cards = list(weather.items())
+card_w = 0.108
+card_h = 0.168
+x0 = 0.535
+y0 = 0.640
+gap_x = 0.009
+gap_y = 0.014
+
+for i, data in enumerate(cards):
+    col = i % 4
+    row = i // 4
+    x = x0 + col * (card_w + gap_x)
+    y = y0 - row * (card_h + gap_y)
+    adm1_name, data = data
+    draw_card(fig, x, y, card_w, card_h, adm1_name, data)
+
+
+# =====================================================
+# 15) LEGEND VA FOOTER
+# =====================================================
+leg_ax = fig.add_axes([0.760, 0.115, 0.205, 0.075], zorder=25)
+leg_ax.axis("off")
+leg_ax.add_patch(FancyBboxPatch(
+    (0, 0), 1, 1,
+    transform=leg_ax.transAxes,
+    boxstyle="round,pad=0.02,rounding_size=0.05",
+    facecolor="white",
+    edgecolor="#D7E3F0",
+    alpha=0.95
+))
+
+legend_items = [
+    ("Quyoshli", "sun"),
+    ("Qisman\nbulutli", "partly"),
+    ("Bulutli", "cloud"),
+    ("Yog‘ingarchilik", "rain"),
+]
+
+for i, (txt, kind) in enumerate(legend_items):
+    xx = 0.12 + i * 0.24
+    put_icon(leg_ax, kind, xx, 0.58, s=0.75, transform=leg_ax.transAxes, z=30)
+    leg_ax.text(xx, 0.18, txt, ha="center", va="center",
+                transform=leg_ax.transAxes,
+                fontsize=7.2, color="#17406E")
+
+fig.text(0.055, 0.045, "@uzgidromet",
+         fontsize=9, color="#0B4EA2", ha="left")
+
+fig.text(0.180, 0.045, "www.uzgidromet.uz",
+         fontsize=9, color="#0B4EA2", ha="left")
+fig.text(0.360, 0.045, "Ishonchli ma‘lumot — xavfsiz kelajak!",
+         fontsize=8.5, color="#17406E", ha="center")
+fig.text(0.565, 0.045,
+         "SEL-SUV TOSHQINI XAVFI: Tog‘li va tog‘oldi hududlarda ehtiyot bo‘ling!",
+         fontsize=9, color="#FFFFFF", ha="left",
+         bbox=dict(facecolor="#0B4EA2", edgecolor="none", pad=5))
+fig.text(0.930, 0.045, "@uzgidromet",
+         fontsize=9, color="#0B4EA2", ha="right")
+# =====================================================
+# 16) SAQLASH
+# =====================================================
+plt.savefig(
+    OUT,
+    dpi=300,
+    bbox_inches="tight",
+    pad_inches=0.02,
+    facecolor=fig.get_facecolor())
+plt.close(fig)
+print("Tayyor saqlandi:", OUT)

@@ -1,0 +1,826 @@
+# -*- coding: utf-8 -*-
+
+import os
+import re
+import numpy as np
+import pandas as pd
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
+from PIL import Image
+
+from matplotlib.patches import FancyBboxPatch, Circle, Polygon, Rectangle
+from matplotlib.lines import Line2D
+from matplotlib.colors import ListedColormap, BoundaryNorm
+
+# =====================================================
+# 1) YO'LLAR
+# =====================================================
+SHP = r"C:\Users\Jahongir\Desktop\Uzgidromet icon\uzb_admbnda_adm1_2018b_uz\uzb_admbnda_adm1_2018b.shp"
+
+TEMPLATE_BG = r"C:\Users\Jahongir\Desktop\Uzgidromet icon\Sel suv toshqinlari\blank_a4_template.png"
+FLOOD_BG = r"C:\Users\Jahongir\Desktop\Uzgidromet icon\Sel suv toshqinlari\flood_mountain.png"
+
+UZGIDRO_LOGO = r"C:\Users\Jahongir\Desktop\Uzgidromet icon\Sel suv toshqinlari\O'zgidromet.png"
+
+OUT = r"C:\Users\Jahongir\Desktop\uzgidromet_4_blok_infografika_FINAL_500DPI.png"
+
+# =====================================================
+# 2) FONT
+# =====================================================
+plt.rcParams["font.family"] = "Cambria"
+plt.rcParams["axes.unicode_minus"] = False
+
+# =====================================================
+# 3) MA'LUMOTLAR
+# =====================================================
+weather = {
+    "Andijon": {"temp": "31-36°", "night": "18-23°", "kind": "storm"},
+    "Buxoro": {"temp": "35-40°", "night": "20-25°", "kind": "sun"},
+    "Jizzax": {"temp": "31-36°", "night": "20-25°", "kind": "rain"},
+    "Farg'ona": {"temp": "31-36°", "night": "18-23°", "kind": "storm"},
+    "Qashqadaryo": {"temp": "35-40°", "night": "22-27°", "kind": "sun"},
+    "Xorazm": {"temp": "37-42°", "night": "20-25°", "kind": "sun"},
+    "Namangan": {"temp": "31-36°", "night": "18-23°", "kind": "storm"},
+    "Navoiy": {"temp": "35-40°", "night": "20-25°", "kind": "sun"},
+    "Qoraqalpog'iston Respublikasi": {"temp": "37-42°", "night": "20-25°", "kind": "sun"},
+    "Samarqand": {"temp": "31-36°", "night": "20-25°", "kind": "rain"},
+    "Surxandaryo": {"temp": "35-40°", "night": "22-27°", "kind": "sun"},
+    "Sirdaryo": {"temp": "31-36°", "night": "20-25°", "kind": "rain"},
+    "Toshkent": {"temp": "31-36°", "night": "20-25°", "kind": "rain"},
+    "Toshkent ш.": {"temp": "31-36°", "night": "20-25°", "kind": "storm"},
+}
+
+side_rows = [
+    ["Toshkent shahri", "20-25°", "31-36°", "storm"],
+    ["Qoraqalpog'iston R., Xorazm", "20-25°", "37-42°", "sun"],
+    ["Buxoro, Navoiy", "20-25°", "35-40°", "sun"],
+    ["Toshkent, Samarqand,\nJizzax, Sirdaryo", "20-25°", "31-36°", "rain"],
+    ["Qashqadaryo,\nSurxondaryo", "22-27°", "35-40°", "sun"],
+    ["Andijon, Namangan,\nFarg'ona", "18-23°", "31-36°", "storm"],
+]
+
+
+# Xaritada viloyat nomlari qisqa va qora yozuvda chiqishi uchun
+region_label_names = {
+    "Qoraqalpog'iston Respublikasi": "Qoraqalpog'iston",
+    "Toshkent ш.": "Toshkent sh.",
+    "Surxandaryo": "Surxondaryo",
+}
+
+# Ayrim kichik viloyatlar bir-biriga kirishib ketmasligi uchun yozuv siljitishlari
+# qiymatlar metrda berilgan, chunki xarita EPSG:3857 proyeksiyasida chiziladi
+label_offsets_temp = {
+    "Andijon": (45000, -15000),
+    "Namangan": (25000, 27000),
+    "Farg'ona": (50000, -45000),
+    "Sirdaryo": (35000, -20000),
+    "Toshkent ш.": (50000, 25000),
+    "Toshkent": (35000, 35000),
+    "Xorazm": (-20000, -45000),
+}
+
+label_offsets_wind = {
+    "Andijon": (45000, -12000),
+    "Namangan": (25000, 25000),
+    "Farg'ona": (50000, -42000),
+    "Sirdaryo": (35000, -16000),
+    "Toshkent ш.": (50000, 23000),
+    "Toshkent": (35000, 33000),
+    "Xorazm": (-20000, -42000),
+}
+
+# =====================================================
+# 4) HARORATNI TO'G'RI O'RTACHALASH
+# =====================================================
+def temp_mid(temp_text):
+    text = str(temp_text)
+    text = text.replace("–", "-").replace("—", "-").replace("−", "-")
+    nums = re.findall(r"\d+(?:\.\d+)?", text)
+
+    if len(nums) >= 2:
+        return (float(nums[0]) + float(nums[1])) / 2.0
+    elif len(nums) == 1:
+        return float(nums[0])
+    return np.nan
+
+# =====================================================
+# 5) HARORAT RANGLARI
+# =====================================================
+temp_levels = [10, 15, 20, 25, 30, 35, 40, 45]
+
+temp_colors = [
+    "#7B3FB2",  # 10-15 sovuq
+    "#2B59C3",  # 15-20 salqin
+    "#1FA187",  # 20-25 mo'tadil
+    "#8DE04F",  # 25-30 iliq
+    "#FFE600",  # 30-35 issiq
+    "#FF7A00",  # 35-40 juda issiq
+    "#B30000",  # 40-45 ekstremal issiq
+]
+
+cmap = ListedColormap(temp_colors)
+norm = BoundaryNorm(temp_levels, ncolors=cmap.N, clip=True)
+
+
+def temp_to_color(value):
+    if pd.isna(value):
+        return "#EEEEEE"
+    elif value < 15:
+        return temp_colors[0]
+    elif value < 20:
+        return temp_colors[1]
+    elif value < 25:
+        return temp_colors[2]
+    elif value < 30:
+        return temp_colors[3]
+    elif value < 35:
+        return temp_colors[4]
+    elif value < 40:
+        return temp_colors[5]
+    else:
+        return temp_colors[6]
+
+# =====================================================
+# 6) ICONLAR
+# =====================================================
+def draw_sun(ax, x, y, s=1, transform=None, z=100):
+    tr = transform if transform is not None else ax.transData
+    r = 23000 * s if transform is None else 0.035 * s
+
+    for a in np.linspace(0, 2 * np.pi, 18, endpoint=False):
+        ax.add_line(Line2D(
+            [x + np.cos(a) * r * 1.25, x + np.cos(a) * r * 1.9],
+            [y + np.sin(a) * r * 1.25, y + np.sin(a) * r * 1.9],
+            color="#FFC400",
+            linewidth=1.7,
+            transform=tr,
+            zorder=z
+        ))
+
+    ax.add_patch(Circle(
+        (x, y), r,
+        facecolor="#FFD21A",
+        edgecolor="#FF9900",
+        linewidth=1.0,
+        transform=tr,
+        zorder=z + 1
+    ))
+
+
+def draw_cloud(ax, x, y, s=1, transform=None, z=100):
+    tr = transform if transform is not None else ax.transData
+    r = 23000 * s if transform is None else 0.035 * s
+
+    ax.add_patch(Circle((x - r, y), r * 0.82, facecolor="#6F8390",
+                        edgecolor="none", transform=tr, zorder=z))
+    ax.add_patch(Circle((x, y + r * 0.35), r, facecolor="#B7C6D0",
+                        edgecolor="#6D7D86", linewidth=0.5,
+                        transform=tr, zorder=z + 1))
+    ax.add_patch(Circle((x + r, y), r * 0.82, facecolor="#6F8390",
+                        edgecolor="none", transform=tr, zorder=z))
+    ax.add_patch(Rectangle(
+        (x - r * 1.75, y - r * 0.55),
+        r * 3.5,
+        r * 0.95,
+        facecolor="#B7C6D0",
+        edgecolor="none",
+        transform=tr,
+        zorder=z + 2
+    ))
+
+
+def draw_rain(ax, x, y, s=1, transform=None, z=100):
+    draw_cloud(ax, x, y, s=s, transform=transform, z=z)
+    tr = transform if transform is not None else ax.transData
+    r = 23000 * s if transform is None else 0.035 * s
+
+    for dx in [-r * 0.8, 0, r * 0.8]:
+        ax.add_line(Line2D(
+            [x + dx, x + dx - r * 0.25],
+            [y - r, y - r * 1.75],
+            color="#009CFF",
+            linewidth=1.7,
+            transform=tr,
+            zorder=z + 5
+        ))
+
+
+def draw_storm(ax, x, y, s=1, transform=None, z=100):
+    draw_rain(ax, x, y, s=s, transform=transform, z=z)
+    tr = transform if transform is not None else ax.transData
+    r = 23000 * s if transform is None else 0.035 * s
+
+    bolt = np.array([
+        [x + r * 0.10, y - r * 0.65],
+        [x - r * 0.42, y - r * 1.95],
+        [x + r * 0.02, y - r * 1.70],
+        [x - r * 0.18, y - r * 2.70],
+        [x + r * 0.75, y - r * 1.35],
+        [x + r * 0.20, y - r * 1.50],
+    ])
+
+    ax.add_patch(Polygon(
+        bolt,
+        closed=True,
+        facecolor="#FFC400",
+        edgecolor="#E09800",
+        linewidth=0.6,
+        transform=tr,
+        zorder=z + 8
+    ))
+
+
+def draw_wind(ax, x, y, s=1, transform=None, z=100):
+    tr = transform if transform is not None else ax.transData
+    r = 23000 * s if transform is None else 0.035 * s
+    color = "#0B4EA2"
+
+    for yshift, length in [(0.45, 3.0), (0.00, 3.4), (-0.45, 2.7)]:
+        ax.add_line(Line2D(
+            [x - r * 1.55, x + r * (length - 1.55)],
+            [y + r * yshift, y + r * yshift],
+            color=color,
+            linewidth=1.10,
+            solid_capstyle="round",
+            transform=tr,
+            zorder=z
+        ))
+
+    ax.add_patch(Circle((x + r * 1.35, y + r * 0.45), r * 0.08,
+                        color=color, transform=tr, zorder=z + 1))
+    ax.add_patch(Circle((x + r * 1.75, y), r * 0.08,
+                        color=color, transform=tr, zorder=z + 1))
+    ax.add_patch(Circle((x + r * 1.10, y - r * 0.45), r * 0.08,
+                        color=color, transform=tr, zorder=z + 1))
+
+
+def put_icon(ax, kind, x, y, s=1, transform=None, z=100):
+    if kind == "sun":
+        draw_sun(ax, x, y, s=s, transform=transform, z=z)
+    elif kind == "rain":
+        draw_rain(ax, x, y, s=s, transform=transform, z=z)
+    elif kind == "storm":
+        draw_storm(ax, x, y, s=s, transform=transform, z=z)
+    elif kind == "wind":
+        draw_wind(ax, x, y, s=s, transform=transform, z=z)
+    else:
+        draw_cloud(ax, x, y, s=s, transform=transform, z=z)
+
+# =====================================================
+# 7) SHP O'QISH
+# =====================================================
+if not os.path.exists(SHP):
+    raise FileNotFoundError(f"SHP topilmadi: {SHP}")
+
+gdf = gpd.read_file(SHP)
+gdf["info"] = gdf["ADM1_UZ"].map(weather)
+
+gdf["map_temp"] = gdf["info"].apply(
+    lambda d: temp_mid(d["temp"]) if isinstance(d, dict) else np.nan
+)
+
+gdf["fill_color"] = gdf["map_temp"].apply(temp_to_color)
+
+print("Mos tushmagan hududlar:")
+print(gdf.loc[gdf["info"].isna(), ["ADM1_UZ", "ADM1_EN", "ADM1_RU"]])
+
+print("\nXaritaga rang berishda ishlatilgan qiymatlar:")
+for _, r in gdf.dropna(subset=["map_temp"]).iterrows():
+    print(r["ADM1_UZ"], r["info"]["temp"], "=>", r["map_temp"], r["fill_color"])
+
+gdf = gdf.to_crs(epsg=3857)
+gdf["point"] = gdf.geometry.representative_point()
+
+minx, miny, maxx, maxy = gdf.total_bounds
+
+# =====================================================
+# 8) TEMPLATE
+# =====================================================
+if not os.path.exists(TEMPLATE_BG):
+    raise FileNotFoundError(f"Template topilmadi: {TEMPLATE_BG}")
+
+template = Image.open(TEMPLATE_BG).convert("RGB")
+tw, th = template.size
+
+fig_w = 11.69
+fig_h = fig_w / (tw / th)
+
+fig = plt.figure(figsize=(fig_w, fig_h), dpi=500)
+fig.patch.set_facecolor("white")
+
+bg_ax = fig.add_axes([0, 0, 1, 1], zorder=0)
+bg_ax.imshow(template, extent=[0, 1, 0, 1], aspect="auto")
+bg_ax.axis("off")
+
+# =====================================================
+# 9) HEADER
+# =====================================================
+if os.path.exists(UZGIDRO_LOGO):
+    uzg_ax = fig.add_axes([0.030, 0.890, 0.085, 0.085], zorder=25)
+    uzg_ax.imshow(Image.open(UZGIDRO_LOGO).convert("RGBA"))
+    uzg_ax.axis("off")
+
+fig.text(
+    0.50,
+    0.950,
+    "16-20 IYUN OB-HAVO PROGNOZI",
+    ha="center",
+    fontsize=24,
+    fontweight="bold",
+    color="white",
+    zorder=30
+)
+
+fig.text(
+    0.50,
+    0.920,
+    "O'zbekiston hududlari bo'yicha 5 kunlik prognoz",
+    ha="center",
+    fontsize=11,
+    color="white",
+    zorder=30
+)
+
+# =====================================================
+# 10) BLOKLAR JOYLASHUVI
+# =====================================================
+ax1_pos = [0.030, 0.535, 0.465, 0.345]
+ax2_pos = [0.505, 0.535, 0.465, 0.345]
+ax3_pos = [0.040, 0.165, 0.455, 0.320]
+ax4_pos = [0.515, 0.180, 0.450, 0.305]
+
+ax1 = fig.add_axes(ax1_pos, zorder=10)
+ax2 = fig.add_axes(ax2_pos, zorder=10)
+ax3 = fig.add_axes(ax3_pos, zorder=10)
+ax4 = fig.add_axes(ax4_pos, zorder=10)
+
+for ax in [ax1, ax2, ax3, ax4]:
+    ax.axis("off")
+
+
+def block_title(ax, title, x=0.50, y=0.920, fontsize=14):
+    ax.text(
+        x,
+        y,
+        title,
+        transform=ax.transAxes,
+        ha="center",
+        va="center",
+        fontsize=fontsize,
+        color="#073B8E",
+        fontweight="bold",
+        zorder=31
+    )
+
+
+
+def get_region_label(row):
+    name = str(row["ADM1_UZ"])
+    return region_label_names.get(name, name)
+
+
+def draw_region_names(ax, offsets=None, fontsize=4.9):
+    """Viloyat nomlarini xaritada qora, kichik yozuvda chiqaradi."""
+    offsets = offsets or {}
+
+    for _, row in gdf.iterrows():
+        info = row["info"]
+        if not isinstance(info, dict):
+            continue
+
+        name = str(row["ADM1_UZ"])
+        x, y = row["point"].x, row["point"].y
+        dx, dy = offsets.get(name, (0, 0))
+
+        ax.text(
+            x + dx,
+            y + dy+30000,
+            get_region_label(row),
+            ha="center",
+            va="center",
+            fontsize=fontsize,
+            fontweight="bold",
+            color="black",
+            zorder=160
+        )
+
+# =====================================================
+# 11) 1-BLOK: HARORAT XARITASI
+# =====================================================
+block_title(ax1, "HARORAT XARITASI", x=0.52, y=0.915)
+
+gdf.plot(
+    ax=ax1,
+    color=gdf["fill_color"],
+    edgecolor="white",
+    linewidth=0.8
+)
+
+gdf.boundary.plot(
+    ax=ax1,
+    color="#0B4EA2",
+    linewidth=0.5
+)
+
+for _, row in gdf.iterrows():
+    info = row["info"]
+    if not isinstance(info, dict):
+        continue
+
+    x, y = row["point"].x, row["point"].y
+
+    scale = 0.42
+    if row["ADM1_UZ"] in ["Andijon", "Namangan", "Farg'ona", "Sirdaryo", "Toshkent ш."]:
+        scale = 0.32
+
+    put_icon(ax1, info["kind"], x, y + 17000, s=scale)
+
+    ax1.text(
+        x,
+        y - 20000,
+        info["temp"],
+        ha="center",
+        va="center",
+        fontsize=7.4,
+        fontweight="bold",
+        color="#0B3D91",
+        path_effects=[pe.withStroke(linewidth=2.1, foreground="white")],
+        zorder=130
+    )
+
+# Viloyat nomlari: qora va kichik yozuvda
+draw_region_names(ax1, offsets=label_offsets_temp, fontsize=4.2)
+
+ax1.set_xlim(minx - 40000, maxx + 40000)
+ax1.set_ylim(miny - 50000, maxy + 50000)
+
+# COLORBAR
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+sm.set_array([])
+
+cbar_x = ax1_pos[0] + 0.115
+cbar_y = ax1_pos[1] + 0.000
+cbar_w = ax1_pos[2] * 0.68
+cbar_h = 0.012
+
+cax = fig.add_axes([cbar_x, cbar_y, cbar_w, cbar_h], zorder=50)
+
+cbar = fig.colorbar(
+    sm,
+    cax=cax,
+    orientation="horizontal",
+    extend="both",
+    boundaries=temp_levels,
+    ticks=temp_levels,
+    spacing="proportional"
+)
+
+cbar.outline.set_linewidth(0.8)
+cbar.ax.tick_params(labelsize=5.5, pad=1)
+cbar.set_label("Kunduzgi harorat, °C", fontsize=6, labelpad=1)
+
+# =====================================================
+# 12) 2-BLOK: SHAMOL VA YOG'INGARCHILIK
+# =====================================================
+block_title(ax2, "SHAMOL VA YOG'INGARCHILIK", x=0.60, y=0.915)
+
+gdf.plot(
+    ax=ax2,
+    color="#EEF7E9",
+    edgecolor="#9AB7A7",
+    linewidth=0.7
+)
+
+rain_regions = [
+    "Andijon", "Namangan", "Farg'ona", "Toshkent",
+    "Samarqand", "Jizzax", "Sirdaryo", "Toshkent ш."
+]
+
+rain_gdf = gdf[gdf["ADM1_UZ"].isin(rain_regions)]
+
+rain_gdf.plot(
+    ax=ax2,
+    color="#9BD8FF",
+    alpha=0.75,
+    edgecolor="#4A9BC7",
+    linewidth=0.7
+)
+
+wind_icons = [
+    (0.20, 0.70, 0.26),
+    (0.34, 0.62, 0.28),
+    (0.48, 0.72, 0.30),
+    (0.62, 0.62, 0.32),
+    (0.73, 0.70, 0.34),
+    (0.30, 0.43, 0.28),
+    (0.47, 0.42, 0.30),
+    (0.64, 0.44, 0.32),
+    (0.76, 0.48, 0.36),
+]
+
+for wx, wy, ss in wind_icons:
+    put_icon(ax2, "wind", wx, wy, s=ss, transform=ax2.transAxes, z=90)
+
+for _, row in rain_gdf.iterrows():
+    x, y = row["point"].x, row["point"].y
+
+    kind = "storm" if row["ADM1_UZ"] in [
+        "Andijon", "Namangan", "Farg'ona", "Toshkent ш."
+    ] else "rain"
+
+    put_icon(ax2, kind, x, y, s=0.40)
+
+# Viloyat nomlari: qora va kichik yozuvda
+draw_region_names(ax2, offsets=label_offsets_wind, fontsize=4.2)
+
+ax2.add_patch(FancyBboxPatch(
+    (0.82, 0.67), 0.18, 0.20,
+    transform=ax2.transAxes,
+    boxstyle="round,pad=0.015,rounding_size=0.018",
+    facecolor="white",
+    edgecolor="#9AB7D0",
+    linewidth=1.2,
+    zorder=50
+))
+
+ax2.text(
+    0.835, 0.825,
+    "SHAMOL",
+    transform=ax2.transAxes,
+    fontsize=9,
+    fontweight="bold",
+    color="#073B8E",
+    zorder=60
+)
+
+ax2.text(
+    0.835, 0.740,
+    "7-12 m/s\n13-18 m/s",
+    transform=ax2.transAxes,
+    fontsize=8.8,
+    fontweight="bold",
+    color="#173B6D",
+    zorder=60
+)
+
+ax2.set_xlim(minx - 40000, maxx + 40000)
+ax2.set_ylim(miny - 50000, maxy + 50000)
+# =====================================================
+# 13) 3-BLOK
+# =====================================================
+block_title(ax3, "MUHIM OGOHLANTIRISH", y=0.935)
+
+ax3.add_patch(FancyBboxPatch(
+    (0.00, 0.02), 1.00, 0.84,
+    transform=ax3.transAxes,
+    boxstyle="round,pad=0.00,rounding_size=0.012",
+    facecolor="white",
+    edgecolor="#D7E3F0",
+    linewidth=1.0,
+    zorder=1
+))
+
+left_x0 = 0.00
+left_x1 = 0.50
+right_x0 = 0.50
+right_x1 = 1.00
+
+ax3.add_patch(Rectangle(
+    (left_x0, 0.18),
+    left_x1 - left_x0,
+    0.68,
+    transform=ax3.transAxes,
+    facecolor="white",
+    edgecolor="none",
+    zorder=2
+))
+
+if os.path.exists(FLOOD_BG):
+    img = Image.open(FLOOD_BG).convert("RGB")
+    ax3.imshow(
+        img,
+        extent=[right_x0, right_x1, 0.18, 0.86],
+        transform=ax3.transAxes,
+        aspect="auto",
+        zorder=1
+    )
+else:
+    ax3.add_patch(Rectangle(
+        (right_x0, 0.18),
+        right_x1 - right_x0,
+        0.68,
+        transform=ax3.transAxes,
+        facecolor="#DDEEFF",
+        edgecolor="none",
+        zorder=1
+    ))
+
+ax3.add_patch(Rectangle(
+    (0, 0.02),
+    1,
+    0.16,
+    transform=ax3.transAxes,
+    facecolor="#D40000",
+    edgecolor="none",
+    zorder=5
+))
+tri = Polygon(
+    [[0.015, 0.58], [0.095, 0.58], [0.055, 0.75]],
+    closed=True,
+    transform=ax3.transAxes,
+    facecolor="white",
+    edgecolor="#D40000",
+    linewidth=2.7,
+    zorder=10
+)
+
+ax3.add_patch(tri)
+
+ax3.text(
+    0.055,
+    0.645,
+    "!",
+    transform=ax3.transAxes,
+    ha="center",
+    va="center",
+    fontsize=21,
+    color="#D40000",
+    fontweight="bold",
+    zorder=11
+)
+ax3.text(
+    0.190,
+    0.705,
+    "16-19 IYUN KUNLARI",
+    transform=ax3.transAxes,
+    fontsize=7.2,
+    color="white",
+    fontweight="bold",
+    ha="center",
+    va="center",
+    bbox=dict(
+        boxstyle="round,pad=0.22",
+        facecolor="#D40000",
+        edgecolor="none"
+    ),
+    zorder=12
+)
+
+ax3.text(
+    0.105,
+    0.590,
+    "SEL-SUV TOSHQIN",
+    transform=ax3.transAxes,
+    fontsize=14.0,
+    color="#C40000",
+    fontweight="bold",
+    ha="left",
+    va="center",
+    zorder=12
+)
+
+ax3.text(
+    0.105,
+    0.495,
+    "HODISALARI YUZAGA\nKELISHI MUMKIN!",
+    transform=ax3.transAxes,
+    fontsize=8.3,
+    color="#111111",
+    fontweight="bold",
+    ha="left",
+    va="center",
+    linespacing=1.05,
+    zorder=12
+)
+
+warning_lines = [
+    ("Tog' oldi va tog'li hududlar", "cloud"),
+    ("Kuchli yomg'irlar", "rain"),
+    ("Sel-suv toshqin xavfi", "storm"),
+]
+
+start_y = 0.350
+row_gap = 0.070
+icon_x = 0.075
+text_x = 0.135
+
+for i, (text, kind) in enumerate(warning_lines):
+    yy = start_y - i * row_gap
+
+    put_icon(ax3, kind, icon_x, yy, s=0.18,
+             transform=ax3.transAxes, z=90)
+
+    ax3.text(
+        text_x,
+        yy,
+        text,
+        transform=ax3.transAxes,
+        fontsize=7.6,
+        color="#173B6D",
+        fontweight="bold",
+        ha="left",
+        va="center",
+        zorder=12
+    )
+
+ax3.text(
+    0.5,
+    0.10,
+    "EHTIYOT BO'LING, XAVFSIZLIK CHORALARIGA RIOYA QILING!",
+    transform=ax3.transAxes,
+    ha="center",
+    va="center",
+    fontsize=9.5,
+    color="white",
+    fontweight="bold",
+    zorder=12
+)
+
+# =====================================================
+# 14) 4-BLOK
+# =====================================================
+block_title(ax4, "VILOYATLAR BO'YICHA PROGNOZ")
+
+ax4.add_patch(FancyBboxPatch(
+    (0.02, 0.05), 0.96, 0.80,
+    transform=ax4.transAxes,
+    boxstyle="round,pad=0.01,rounding_size=0.02",
+    facecolor="white",
+    edgecolor="#CFE0EE",
+    linewidth=1.1,
+    zorder=1
+))
+
+cols = [0.05, 0.52, 0.70, 0.86]
+
+ax4.text(cols[0], 0.80, "Hudud",
+         transform=ax4.transAxes,
+         fontsize=8,
+         fontweight="bold",
+         color="#173B6D")
+ax4.text(cols[1], 0.80, "Kechasi",
+         transform=ax4.transAxes,
+         fontsize=8,
+         fontweight="bold",
+         color="#173B6D")
+
+ax4.text(cols[2], 0.80, "Kunduzi",
+         transform=ax4.transAxes,
+         fontsize=8,
+         fontweight="bold",
+         color="#173B6D")
+ax4.text(cols[3], 0.80, "Holat",
+         transform=ax4.transAxes,
+         fontsize=8,
+         fontweight="bold",
+         color="#173B6D")
+y0 = 0.72
+row_h = 0.105
+for i, (region, night, day, kind) in enumerate(side_rows):
+    y = y0 - i * row_h
+
+    if i % 2 == 0:
+        ax4.add_patch(Rectangle(
+            (0.035, y - 0.035),
+            0.93,
+            row_h,
+            transform=ax4.transAxes,
+            facecolor="#F6FBFF",
+            edgecolor="none",
+            zorder=2
+        ))
+
+    ax4.text(cols[0], y, region,
+             transform=ax4.transAxes,
+             fontsize=7.2,
+             color="#173B6D",
+             fontweight="bold",
+             va="center",
+             zorder=3)
+    ax4.text(cols[1], y, night,
+             transform=ax4.transAxes,
+             fontsize=8,
+             color="#173B6D",
+             va="center",
+             zorder=3)
+    ax4.text(cols[2], y, day,
+             transform=ax4.transAxes,
+             fontsize=8,
+             color="#C22A00",
+             fontweight="bold",
+             va="center",
+             zorder=3)
+    put_icon(ax4, kind, cols[3] + 0.045, y,
+             s=0.25, transform=ax4.transAxes, z=90)
+# =====================================================
+# 15) SAQLASH
+# =====================================================
+plt.savefig(
+    OUT,
+    dpi=500,
+    bbox_inches="tight",
+    pad_inches=0,
+    facecolor=fig.get_facecolor())
+plt.close(fig)
+print("Tayyor saqlandi:", OUT)
