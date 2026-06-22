@@ -16,12 +16,8 @@ try:
 except ImportError:
     HAS_MAP_RENDERER = False
 
-# pro_renderer — matplotlib+geopandas professional 4-blokli render
-try:
-    from pro_renderer import render_pro_forecast
-    HAS_PRO_RENDERER = True
-except ImportError:
-    HAS_PRO_RENDERER = False
+# pro_renderer — o'chirilgan (geopandas kerak, Render'da ishlamaydi)
+HAS_PRO_RENDERER = False
 
 # card_renderer — PIL asosida kartochka generatori (fallback)
 try:
@@ -143,21 +139,26 @@ def generate():
                 except Exception as e:
                     print(f"[pro_renderer] xatolik: {e}")
 
-            # 2) Fallback: PIL kartochka renderer
+            # 2) card_renderer (matplotlib + GeoJSON)
             if HAS_CARD_RENDERER and not rendered:
                 try:
                     render_forecast_card(day, output_path)
                     rendered = True
-                    # Ikkinchi rasm (jadval) ham qo'shish
+                    # map va table rasmlarni qo'shish
+                    map_filename = f"prognoz_{forecast.id}_day{i+1}_map.png"
                     tbl_filename = f"prognoz_{forecast.id}_day{i+1}_table.png"
-                    tbl_path = str(OUTPUT_DIR / tbl_filename)
-                    if Path(tbl_path).exists():
+                    map_path = OUTPUT_DIR / map_filename
+                    tbl_path = OUTPUT_DIR / tbl_filename
+                    if map_path.exists():
+                        images.append(f"/static/output/{map_filename}")
+                    if tbl_path.exists():
                         images.append(f"/static/output/{tbl_filename}")
                 except Exception as e:
                     print(f"[card_renderer] xatolik: {e}")
+                    import traceback
+                    traceback.print_exc()
 
             if rendered:
-                images.append(f"/static/output/{filename}")
                 if i == 0:
                     forecast.image1_path = output_path
                 elif i == 1:

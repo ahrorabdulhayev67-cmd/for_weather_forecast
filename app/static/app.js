@@ -239,12 +239,19 @@ async function generateMap() {
         const result = await response.json();
 
         if (result.success && result.images && result.images.length > 0) {
-            // Server rasm qaytardi — ko'rsatish
+            // Server rasmlar qaytardi — hammasini ko'rsatish
             const container = document.getElementById('mapContainer');
-            container.innerHTML = '<img src="' + result.images[0] + '" style="width:100%;border-radius:8px;" alt="Prognoz xaritasi">';
+            let html = '';
+            result.images.forEach(function(url, idx) {
+                html += '<div style="margin-bottom:16px;">';
+                html += '<img src="' + url + '" style="width:100%;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" alt="Prognoz ' + (idx+1) + '">';
+                html += '<a href="' + url + '" download style="display:inline-block;margin-top:6px;font-size:12px;color:#0B3D8F;">PNG yuklab olish</a>';
+                html += '</div>';
+            });
+            container.innerHTML = html;
             document.getElementById('resultPanel').style.display = 'block';
             document.getElementById('resultPanel').scrollIntoView({ behavior: 'smooth' });
-            showNotification("Prognoz rasmi muvaffaqiyatli yaratildi!");
+            showNotification("Prognoz rasmlari muvaffaqiyatli yaratildi!");
         } else {
             // Fallback: lokal SVG
             await generateMapLocal(weatherData, dateInput);
