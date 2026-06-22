@@ -148,6 +148,11 @@ def generate():
                 try:
                     render_forecast_card(day, output_path)
                     rendered = True
+                    # Ikkinchi rasm (jadval) ham qo'shish
+                    tbl_filename = f"prognoz_{forecast.id}_day{i+1}_table.png"
+                    tbl_path = str(OUTPUT_DIR / tbl_filename)
+                    if Path(tbl_path).exists():
+                        images.append(f"/static/output/{tbl_filename}")
                 except Exception as e:
                     print(f"[card_renderer] xatolik: {e}")
 
