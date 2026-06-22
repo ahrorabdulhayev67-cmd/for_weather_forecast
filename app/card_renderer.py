@@ -134,11 +134,11 @@ def render_forecast_card(day_data, output_path, dpi=150):
     else:
         dt = datetime.now()
         date_label = f"{dt.day} {MONTHS_UZ[dt.month-1]} {dt.year}, {DAYS_UZ[dt.weekday()]}"
-    draw.text((20, 40), date_label, fill="rgba(255,255,255,0.8)", font=font_sub)
+    draw.text((20, 40), date_label, fill="#CCDDFF", font=font_sub)
 
     # Logo o'ng tomonda
     draw.text((WIDTH - 200, 15), "O'ZGIDROMET", fill="#FFFFFF", font=get_font(16, bold=True))
-    draw.text((WIDTH - 200, 38), "hydromet.uz", fill="rgba(255,255,255,0.7)", font=font_sub)
+    draw.text((WIDTH - 200, 38), "hydromet.uz", fill="#AAC4E8", font=font_sub)
 
     # === AJRATUVCHI CHIZIQ ===
     y_start = 65
