@@ -26,7 +26,18 @@
                 <h2>Prognoz ma'lumotlarini kiriting</h2>
                 <div class="panel-controls">
                     <input type="date" id="forecastDate" class="date-input">
+                    <button class="btn btn-outline" id="btnModeText">Matn rejimi</button>
                     <button class="btn btn-outline" id="btnLoadSample">Namuna</button>
+                </div>
+            </div>
+
+            <!-- MATN REJIMI: TG matnini paste qilish -->
+            <div id="textModeBlock" style="display:none; padding:12px 16px;">
+                <label style="display:block;font-size:11px;font-weight:600;color:#4a5e73;margin-bottom:6px;">O'zgidromet Telegram matnini bu yerga qo'ying:</label>
+                <textarea id="rawForecastText" rows="10" style="width:100%;padding:10px;border:1px solid #dfe4ea;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;" placeholder="🔷23-IYUNGA OB-HAVO PROGNOZI&#10;22-iyun soat 20:00 dan 23-iyun soat 20:00 gacha&#10;&#10;🔷TOSHKENT SHAHRI: Havo o'zgaruvchan..."></textarea>
+                <div style="padding:10px 0;text-align:center;">
+                    <button class="btn btn-primary" id="btnParseText">Matndan rasm yaratish</button>
+                    <button class="btn btn-outline" id="btnBackToTable">Jadvalga qaytish</button>
                 </div>
             </div>
 

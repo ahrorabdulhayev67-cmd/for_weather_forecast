@@ -30,6 +30,13 @@ try:
 except ImportError:
     HAS_CARD_RENDERER = False
 
+# text_parser — Telegram matn parser
+try:
+    from text_parser import parse_forecast_text
+    HAS_TEXT_PARSER = True
+except ImportError:
+    HAS_TEXT_PARSER = False
+
 # PDF va Telegram ixtiyoriy
 try:
     from pdf_export import export_forecast_pdf
@@ -87,7 +94,21 @@ def generate():
     """3 kunlik prognoz ma'lumotlarini saqlaydi va Telegram matnini qaytaradi."""
     try:
         data = request.get_json()
-        days = data.get("days", [])
+
+        # Matn rejimi: Telegram matn paste qilingan bo'lsa parse qilish
+        raw_text = data.get("raw_text", "")
+        if raw_text and HAS_TEXT_PARSER:
+            parsed = parse_forecast_text(raw_text)
+            days = [{
+                "date": data.get("date", ""),
+                "day_index": 0,
+                "cities": parsed.get("cities", {}),
+                "comment": parsed.get("warning", ""),
+                "groups": parsed.get("groups", []),
+            }]
+        else:
+            days = data.get("days", [])
+
         if not days:
             return jsonify({"success": False, "error": "Ma'lumot topilmadi"})
 

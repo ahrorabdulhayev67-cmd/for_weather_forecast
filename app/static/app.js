@@ -296,7 +296,61 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btnLoadSample').addEventListener('click', loadSampleData);
     document.getElementById('btnDownloadPng').addEventListener('click', downloadPng);
     document.getElementById('btnDownloadSvg').addEventListener('click', downloadSvg);
+
+    // Matn rejimi
+    document.getElementById('btnModeText').addEventListener('click', function() {
+        document.getElementById('textModeBlock').style.display = 'block';
+        document.querySelector('.table-container').style.display = 'none';
+        document.querySelector('.action-bar').style.display = 'none';
+        this.classList.add('btn-primary');
+        this.classList.remove('btn-outline');
+    });
+    document.getElementById('btnBackToTable').addEventListener('click', function() {
+        document.getElementById('textModeBlock').style.display = 'none';
+        document.querySelector('.table-container').style.display = '';
+        document.querySelector('.action-bar').style.display = '';
+        document.getElementById('btnModeText').classList.remove('btn-primary');
+        document.getElementById('btnModeText').classList.add('btn-outline');
+    });
+    document.getElementById('btnParseText').addEventListener('click', generateFromText);
     
     // Preload icons in background
     loadIconsAsDataURIs();
 });
+
+// ===== MATN REJIMI — TG matnidan rasm yaratish =====
+function generateFromText() {
+    var text = document.getElementById('rawForecastText').value.trim();
+    if (!text) {
+        alert("Iltimos, O'zgidromet Telegram matnini kiriting!");
+        return;
+    }
+
+    var dateInput = document.getElementById('forecastDate');
+    var dateVal = dateInput ? dateInput.value : '';
+
+    fetch('/api/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({raw_text: text, date: dateVal})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+        if (result.success) {
+            // Natijani ko'rsatish
+            var resultPanel = document.getElementById('resultPanel');
+            if (resultPanel) resultPanel.style.display = 'block';
+            // Rasmni ko'rsatish
+            if (result.images && result.images.length > 0) {
+                var imgEl = document.getElementById('resultImage');
+                if (imgEl) imgEl.src = result.images[0];
+            }
+            alert("Prognoz muvaffaqiyatli yaratildi!");
+        } else {
+            alert("Xatolik: " + (result.error || "Noma'lum"));
+        }
+    })
+    .catch(function(err) {
+        alert("Server bilan bog'lanib bo'lmadi: " + err.message);
+    });
+}
