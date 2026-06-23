@@ -303,7 +303,7 @@ function renderWeatherMap(weatherData, dateStr, title) {
     }
 
     // === SUV HAVZALARI (daryolar, ko'llar) ===
-    svg += renderWaterBodies();
+    // MUHIM: regionlar + city markerlardan KEYIN chiziladi (ustda turishi uchun)
 
     // City markers + labels (only big regions shown on map)
     for (const [cityName, cityData] of Object.entries(CITIES)) {
@@ -340,6 +340,9 @@ function renderWeatherMap(weatherData, dateStr, title) {
 
     // Colorbar (pastda, xarita ichida)
     svg += renderColorbar(120, H - 50, 400, 12);
+
+    // === SUV HAVZALARI — eng oxirida, hamma narsadan ustda ===
+    svg += renderWaterBodies();
 
     // === RIGHT: VILOYAT KARTOCHKALARI ===
     svg += renderRightPanel(mapW + 18, 76, panelW - 6, H - 84, weatherData, dateStr);
