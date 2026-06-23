@@ -7,10 +7,11 @@
     <link rel="stylesheet" href="/static/styles.css?v=7">
 </head>
 <body>
-    <!-- DEPLOY TEST: agar quyidagi ko'k to'rtburchak ko'rinsa — yangi kod deploy bo'lgan -->
+    <!-- DEPLOY TEST -->
     <div style="background:#0B3D91;color:white;padding:20px;text-align:center;font-family:Arial;font-size:24px;font-weight:bold;">
         VERSIYA 7.0 — SUV HAVZALARI + KATTA SHRIFTLAR
         <div style="font-size:14px;margin-top:8px;opacity:0.8;">Agar bu yozuvni ko'rsangiz — yangi kod ishlayapti!</div>
+        <div id="debugInfo" style="font-size:12px;margin-top:8px;background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;text-align:left;font-weight:normal;">Yuklanmoqda...</div>
     </div>
 
     <!-- HEADER -->
@@ -101,8 +102,23 @@
         </div>
     </footer>
 
-    <script src="/static/regions.js?v=6"></script>
-    <script src="/static/weather-map.js?v=6"></script>
-    <script src="/static/app.js?v=6"></script>
+    <script src="/static/regions.js?v=7"></script>
+    <script src="/static/weather-map.js?v=7"></script>
+    <script src="/static/app.js?v=7"></script>
+    <script>
+    // DEBUG: JS fayllar yuklanganini tekshirish
+    window.addEventListener('load', function() {
+        var info = [];
+        info.push('regions.js: ' + (typeof REGIONS !== 'undefined' ? Object.keys(REGIONS).length + ' viloyat' : 'YUKLANMAGAN!'));
+        info.push('weather-map.js: ' + (typeof renderWeatherMap !== 'undefined' ? 'OK' : 'YUKLANMAGAN!'));
+        info.push('renderWaterBodies: ' + (typeof renderWaterBodies !== 'undefined' ? 'OK' : 'YO\'Q!'));
+        info.push('geoToSvg: ' + (typeof geoToSvg !== 'undefined' ? 'OK' : 'YO\'Q!'));
+        info.push('setMapViewport: ' + (typeof setMapViewport !== 'undefined' ? 'OK' : 'YO\'Q!'));
+        info.push('iconCache: ' + (typeof iconCache !== 'undefined' ? Object.keys(iconCache).length + ' icon' : 'YO\'Q!'));
+        
+        var el = document.getElementById('debugInfo');
+        if (el) el.textContent = info.join(' | ');
+    });
+    </script>
 </body>
 </html>
