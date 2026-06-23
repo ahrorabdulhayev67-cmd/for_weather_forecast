@@ -10,9 +10,10 @@
     <!-- DEPLOY TEST -->
     <div style="background:#0B3D91;color:white;padding:20px;text-align:center;font-family:Arial;font-size:24px;font-weight:bold;">
         VERSIYA 7.0 — SUV HAVZALARI + KATTA SHRIFTLAR
-        <div style="font-size:14px;margin-top:8px;opacity:0.8;">Agar bu yozuvni ko'rsangiz — yangi kod ishlayapti!</div>
         <div id="debugInfo" style="font-size:12px;margin-top:8px;background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;text-align:left;font-weight:normal;">Yuklanmoqda...</div>
     </div>
+    <!-- INLINE WATER TEST: bu hech narsaga bog'liq emas, faqat suv havzalari ko'rinadimi -->
+    <div id="waterTest" style="margin:10px;padding:10px;background:#f0f0f0;border:2px solid red;"></div>
 
     <!-- HEADER -->
     <header class="header">
@@ -117,13 +118,19 @@
         info.push('setMapViewport: ' + (typeof setMapViewport !== 'undefined' ? 'OK' : 'YO\'Q!'));
         info.push('iconCache: ' + (typeof iconCache !== 'undefined' ? Object.keys(iconCache).length + ' icon' : 'YO\'Q!'));
         
-        // TEST: renderWaterBodies chaqirib natijasini ko'rish
+        // TEST: suv havzalarini alohida SVG sifatida ko'rsatish
         if (typeof setMapViewport === 'function' && typeof renderWaterBodies === 'function') {
-            setMapViewport(30, 85, 700, 500);
+            setMapViewport(30, 30, 600, 400);
             var waterSvg = renderWaterBodies();
-            info.push('WATER SVG LENGTH: ' + waterSvg.length);
-            info.push('HAS POLYLINE: ' + (waterSvg.indexOf('<polyline') >= 0));
-            info.push('HAS PATH: ' + (waterSvg.indexOf('<path') >= 0));
+            info.push('WATER LENGTH: ' + waterSvg.length);
+            // Suv havzalarini qizil chegarali div ichida ko'rsatish
+            var testDiv = document.getElementById('waterTest');
+            if (testDiv) {
+                testDiv.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="650" height="450" viewBox="0 0 650 450">' +
+                    '<rect width="650" height="450" fill="#E8F5E9"/>' +
+                    waterSvg +
+                    '</svg>';
+            }
         }
         
         var el = document.getElementById('debugInfo');
