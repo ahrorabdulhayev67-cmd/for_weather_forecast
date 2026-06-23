@@ -168,7 +168,7 @@ function renderRightPanel(x0, y0, panelW, panelH, weatherData, dateStr) {
     // Panel header
     s += `<rect x="${x0}" y="${y0}" width="${panelW}" height="50" rx="10" fill="#1a3a6b"/>`;
     s += `<rect x="${x0}" y="${y0 + 35}" width="${panelW}" height="15" fill="#1a3a6b"/>`;
-    s += `<text x="${x0 + panelW / 2}" y="${y0 + 25}" text-anchor="middle" font-size="16" font-weight="bold" fill="white" font-family="Arial,sans-serif">VILOYATLAR BO'YICHA PROGNOZ</text>`;
+    s += `<text x="${x0 + panelW / 2}" y="${y0 + 25}" text-anchor="middle" font-size="18" font-weight="bold" fill="white" font-family="Arial,sans-serif">VILOYATLAR BO'YICHA PROGNOZ</text>`;
     s += `<text x="${x0 + panelW / 2}" y="${y0 + 43}" text-anchor="middle" font-size="13" fill="rgba(255,255,255,0.7)" font-family="Arial,sans-serif">Ertangi kun uchun / ${dateStr}</text>`;
 
     // Grid: 3 columns x 5 rows (or 4x4 with last row 2)
@@ -218,7 +218,7 @@ function renderRightPanel(x0, y0, panelW, panelH, weatherData, dateStr) {
         s += `<rect x="${cx}" y="${cy}" width="${cardW}" height="${cardH}" rx="6" fill="white" stroke="#e0e0e0" stroke-width="1"/>`;
 
         // Header: name + badge
-        s += `<text x="${cx + 8}" y="${cy + 16}" font-size="12" font-weight="bold" fill="#1a3a6b" font-family="Arial,sans-serif">${SHORT_NAMES[city] || city.toUpperCase()}</text>`;
+        s += `<text x="${cx + 8}" y="${cy + 16}" font-size="13" font-weight="bold" fill="#1a3a6b" font-family="Arial,sans-serif">${SHORT_NAMES[city] || city.toUpperCase()}</text>`;
 
         // Badge
         const badge = BADGES[city] || "??";
@@ -233,16 +233,16 @@ function renderRightPanel(x0, y0, panelW, panelH, weatherData, dateStr) {
         }
 
         // Day temp (red, bold)
-        s += `<text x="${cx + 8}" y="${cy + 78}" font-size="16" font-weight="bold" fill="#C62828" font-family="Arial,sans-serif">${w.temp_min}...${w.temp_max}°C</text>`;
+        s += `<text x="${cx + 8}" y="${cy + 78}" font-size="18" font-weight="bold" fill="#C62828" font-family="Arial,sans-serif">${w.temp_min}...${w.temp_max}°C</text>`;
 
         // Night temp (blue)
         if (w.temp_min != null) {
-            s += `<text x="${cx + 8}" y="${cy + 94}" font-size="12" fill="#0D47A1" font-family="Arial,sans-serif">kechasi: ${w.temp_min}°C</text>`;
+            s += `<text x="${cx + 8}" y="${cy + 94}" font-size="13" fill="#0D47A1" font-family="Arial,sans-serif">kechasi: ${w.temp_min}°C</text>`;
         }
 
         // Weather label
         const wLabel = WEATHER_LABELS_UZ[weatherType] || '';
-        s += `<text x="${cx + 8}" y="${cy + 108}" font-size="12" fill="#546E7A" font-family="Arial,sans-serif">${wLabel}</text>`;
+        s += `<text x="${cx + 8}" y="${cy + 108}" font-size="11" fill="#546E7A" font-family="Arial,sans-serif">${wLabel}</text>`;
     });
 
     return s;
@@ -271,11 +271,11 @@ function renderWeatherMap(weatherData, dateStr, title) {
     svg += `<image x="12" y="8" width="54" height="54" href="/static/uzhydromet-logo.jpg" preserveAspectRatio="xMidYMid meet"/>`;
 
     // Header text
-    svg += `<text x="75" y="30" font-size="17" font-weight="bold" fill="white" font-family="Arial,sans-serif">O'ZGIDROMET</text>`;
+    svg += `<text x="75" y="30" font-size="19" font-weight="bold" fill="white" font-family="Arial,sans-serif">O'ZGIDROMET</text>`;
     svg += `<text x="75" y="50" font-size="12" fill="rgba(255,255,255,0.8)" font-family="Arial,sans-serif">O'zbekiston Gidrometeorologiya xizmati agentligi</text>`;
 
     // Center title
-    svg += `<text x="${W / 2}" y="30" text-anchor="middle" font-size="22" font-weight="bold" fill="#FFD600" font-family="Arial,sans-serif">OB-HAVO PROGNOZI</text>`;
+    svg += `<text x="${W / 2}" y="30" text-anchor="middle" font-size="24" font-weight="bold" fill="#FFD600" font-family="Arial,sans-serif">OB-HAVO PROGNOZI</text>`;
     svg += `<text x="${W / 2}" y="50" text-anchor="middle" font-size="13" fill="rgba(255,255,255,0.9)" font-family="Arial,sans-serif">${dateStr}</text>`;
 
     svg += `<text x="${W - 20}" y="40" text-anchor="end" font-size="13" fill="rgba(255,255,255,0.7)" font-family="Arial,sans-serif">hydromet.uz</text>`;
@@ -333,7 +333,7 @@ function renderWeatherMap(weatherData, dateStr, title) {
             svg += `<text x="${lx}" y="${ly + 25}" text-anchor="middle" font-size="12" font-weight="bold" fill="#C62828" font-family="Arial,sans-serif" stroke="white" stroke-width="2" paint-order="stroke">${tempStr}</text>`;
         } else {
             // Farg'ona vodiysi: faqat kichik nom
-            svg += `<text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="8.5" fill="#0B3D91" font-family="Arial,sans-serif" stroke="white" stroke-width="1.5" paint-order="stroke">${cityName}</text>`;
+            svg += `<text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="11" fill="#0B3D91" font-family="Arial,sans-serif" stroke="white" stroke-width="1.5" paint-order="stroke">${cityName}</text>`;
         }
     }
 
