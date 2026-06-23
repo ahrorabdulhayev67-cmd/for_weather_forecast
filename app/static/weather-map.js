@@ -61,6 +61,67 @@ async function loadIconsAsDataURIs() {
     await Promise.all(promises);
 }
 
+// ===== SUV HAVZALARI (daryolar, ko'llar) =====
+function renderWaterBodies() {
+    let s = '';
+    const waterColor = '#4FC3F7';
+    const riverColor = '#29B6F6';
+    const lakeColor = '#81D4FA';
+
+    // --- OROL DENGIZI (qoldiqlari) ---
+    // G'arbiy havza ~ (58.2-59.5, 44.5-45.5)
+    const aral1 = [[58.3,45.2],[58.6,45.4],[59.0,45.3],[59.3,45.0],[59.1,44.7],[58.7,44.6],[58.3,44.8],[58.3,45.2]];
+    s += `<path d="${ringToPath(aral1)}" fill="${lakeColor}" fill-opacity="0.7" stroke="${riverColor}" stroke-width="0.8"/>`;
+    // Sharqiy kichik havza
+    const aral2 = [[59.5,44.8],[59.8,45.0],[60.2,44.9],[60.0,44.5],[59.5,44.5],[59.5,44.8]];
+    s += `<path d="${ringToPath(aral2)}" fill="${lakeColor}" fill-opacity="0.5" stroke="${riverColor}" stroke-width="0.6"/>`;
+
+    // --- AYDAR KO'LI (Jizzax/Navoiy, ~40.8-41.2, 65.5-68.0) ---
+    const aydar = [[65.8,40.9],[66.3,41.1],[67.0,41.15],[67.5,41.1],[67.8,40.95],[67.5,40.85],[67.0,40.8],[66.3,40.85],[65.8,40.9]];
+    s += `<path d="${ringToPath(aydar)}" fill="${lakeColor}" fill-opacity="0.6" stroke="${riverColor}" stroke-width="0.7"/>`;
+
+    // --- AMUDARYO (asosiy oqim: Termiz → Nukus → Orol) ---
+    const amu = [
+        [67.3,37.3],[67.0,37.5],[66.8,37.8],[66.5,38.2],[66.0,38.8],
+        [65.5,39.3],[64.5,39.8],[63.5,40.5],[62.5,41.0],[61.8,41.5],
+        [61.0,41.8],[60.5,42.0],[60.0,42.3],[59.5,42.8],[59.2,43.5],
+        [58.8,44.2],[58.7,44.6]
+    ];
+    s += `<polyline points="${amu.map(p => geoToSvg(p[0],p[1]).join(',')).join(' ')}" fill="none" stroke="${riverColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>`;
+
+    // --- SIRDARYO (Farg'ona → Guliston → Orol) ---
+    const sir = [
+        [71.5,40.3],[71.0,40.5],[70.3,40.5],[69.8,40.6],[69.2,40.8],
+        [68.7,40.5],[68.2,40.4],[67.8,40.6],[67.2,40.8],[66.5,41.0],
+        [65.8,41.2],[65.0,41.5],[64.0,42.0],[63.0,42.5],[62.0,43.0],
+        [61.0,43.5],[60.0,44.0],[59.5,44.5]
+    ];
+    s += `<polyline points="${sir.map(p => geoToSvg(p[0],p[1]).join(',')).join(' ')}" fill="none" stroke="${riverColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>`;
+
+    // --- ZARAFSHON (Samarqand → Buxoro) ---
+    const zarafshon = [
+        [70.0,39.7],[69.5,39.7],[69.0,39.7],[68.5,39.7],[68.0,39.8],
+        [67.5,39.7],[67.0,39.7],[66.5,39.8],[66.0,39.8],[65.5,39.8],[65.0,39.9],[64.5,39.8]
+    ];
+    s += `<polyline points="${zarafshon.map(p => geoToSvg(p[0],p[1]).join(',')).join(' ')}" fill="none" stroke="${riverColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>`;
+
+    // --- CHIRCHIQ (Toshkent) ---
+    const chirchiq = [
+        [70.0,41.5],[69.8,41.4],[69.5,41.3],[69.3,41.2],[69.1,41.1],[68.9,41.0]
+    ];
+    s += `<polyline points="${chirchiq.map(p => geoToSvg(p[0],p[1]).join(',')).join(' ')}" fill="none" stroke="${riverColor}" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>`;
+
+    // --- CHARVAK SUV OMBORI ---
+    const charvak = [[70.0,41.6],[70.1,41.65],[70.2,41.62],[70.15,41.55],[70.05,41.55],[70.0,41.6]];
+    s += `<path d="${ringToPath(charvak)}" fill="${lakeColor}" fill-opacity="0.7" stroke="${riverColor}" stroke-width="0.5"/>`;
+
+    // --- TUZKON KO'LI (Jizzax) ---
+    const tuzkon = [[68.2,40.0],[68.4,40.05],[68.5,40.0],[68.4,39.9],[68.2,39.9],[68.2,40.0]];
+    s += `<path d="${ringToPath(tuzkon)}" fill="${lakeColor}" fill-opacity="0.5" stroke="${riverColor}" stroke-width="0.5"/>`;
+
+    return s;
+}
+
 // ===== XARITA LABELLARI (faqat katta viloyatlar uchun) =====
 // Farg'ona vodiysi labellar O'NG PANELda ko'rsatiladi, xaritada emas
 const MAP_LABELS = {
@@ -239,6 +300,9 @@ function renderWeatherMap(weatherData, dateStr, title) {
         svg += `<path d="${pathD.trim()}" fill="${fillColor}" fill-opacity="0.85" stroke="white" stroke-width="2.5" stroke-linejoin="round"/>`;
         svg += `<path d="${pathD.trim()}" fill="none" stroke="#0B4EA2" stroke-width="0.4" stroke-linejoin="round" opacity="0.5"/>`;
     }
+
+    // === SUV HAVZALARI (daryolar, ko'llar) ===
+    svg += renderWaterBodies();
 
     // City markers + labels (only big regions shown on map)
     for (const [cityName, cityData] of Object.entries(CITIES)) {
