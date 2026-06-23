@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ob-havo prognozi — Gidrometeorologiya xizmati</title>
+    <link rel="stylesheet" href="static/styles.css?v=6">
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-brand">
+            <img src="static/uzhydromet-logo.jpg" alt="Logo" class="logo" onerror="this.style.display='none'">
+            <div class="header-text">
+                <h1>Gidrometeorologiya xizmati agentligi</h1>
+                <p>Ob-havo prognozi xarita generatori</p>
+            </div>
+        </div>
+        <div class="header-meta" id="currentDate"></div>
+    </header>
+
+    <main class="main">
+        <!-- MA'LUMOT KIRITISH PANELI -->
+        <div class="panel">
+            <div class="panel-title">
+                <h2>Prognoz ma'lumotlarini kiriting</h2>
+                <div class="panel-controls">
+                    <input type="date" id="forecastDate" class="date-input">
+                    <button class="btn btn-outline" id="btnModeText">Matn rejimi</button>
+                    <button class="btn btn-outline" id="btnLoadSample">Namuna</button>
+                </div>
+            </div>
+
+            <!-- MATN REJIMI: TG matnini paste qilish -->
+            <div id="textModeBlock" style="display:none; padding:12px 16px;">
+                <label style="display:block;font-size:11px;font-weight:600;color:#4a5e73;margin-bottom:6px;">O'zgidromet Telegram matnini bu yerga qo'ying:</label>
+                <textarea id="rawForecastText" rows="10" style="width:100%;padding:10px;border:1px solid #dfe4ea;border-radius:6px;font-size:12px;font-family:inherit;resize:vertical;" placeholder="🔷23-IYUNGA OB-HAVO PROGNOZI&#10;22-iyun soat 20:00 dan 23-iyun soat 20:00 gacha&#10;&#10;🔷TOSHKENT SHAHRI: Havo o'zgaruvchan..."></textarea>
+                <div style="padding:10px 0;text-align:center;">
+                    <button class="btn btn-primary" id="btnParseText">Matndan rasm yaratish</button>
+                    <button class="btn btn-outline" id="btnBackToTable">Jadvalga qaytish</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table" id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>Shahar</th>
+                            <th>T min °C</th>
+                            <th>T max °C</th>
+                            <th>Shamol m/s</th>
+                            <th>Yog'in mm</th>
+                            <th>Hodisa</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- GENERATSIYA TUGMASI -->
+            <div class="action-bar">
+                <button class="btn btn-primary btn-lg" id="btnGenerate">
+                    Xaritani yaratish
+                </button>
+            </div>
+        </div>
+
+        <!-- NATIJA PANELI -->
+        <div class="panel" id="resultPanel" style="display:none;">
+            <div class="panel-title">
+                <h2>Ob-havo xaritasi</h2>
+                <div class="panel-controls">
+                    <button class="btn btn-primary" id="btnDownloadPng">
+                        PNG yuklab olish
+                    </button>
+                    <button class="btn btn-outline" id="btnDownloadSvg">
+                        SVG yuklab olish
+                    </button>
+                </div>
+            </div>
+            <div class="map-result" id="mapContainer">
+            </div>
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div>
+            <strong>Gidrometeorologiya xizmati agentligi</strong>
+            <div class="footer-contact">hydromet.uz</div>
+        </div>
+        <div class="footer-links">
+            <span>v6.0 — suv havzalari + katta shriftlar</span>
+        </div>
+    </footer>
+
+    <script src="static/regions.js?v=6"></script>
+    <script src="static/weather-map.js?v=6"></script>
+    <script src="static/app.js?v=6"></script>
+</body>
+</html>
