@@ -117,6 +117,15 @@
         info.push('setMapViewport: ' + (typeof setMapViewport !== 'undefined' ? 'OK' : 'YO\'Q!'));
         info.push('iconCache: ' + (typeof iconCache !== 'undefined' ? Object.keys(iconCache).length + ' icon' : 'YO\'Q!'));
         
+        // TEST: renderWaterBodies chaqirib natijasini ko'rish
+        if (typeof setMapViewport === 'function' && typeof renderWaterBodies === 'function') {
+            setMapViewport(30, 85, 700, 500);
+            var waterSvg = renderWaterBodies();
+            info.push('WATER SVG LENGTH: ' + waterSvg.length);
+            info.push('HAS POLYLINE: ' + (waterSvg.indexOf('<polyline') >= 0));
+            info.push('HAS PATH: ' + (waterSvg.indexOf('<path') >= 0));
+        }
+        
         var el = document.getElementById('debugInfo');
         if (el) el.textContent = info.join(' | ');
     });
